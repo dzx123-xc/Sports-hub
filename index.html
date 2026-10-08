@@ -146,6 +146,7 @@
           <div class="role-select-grid">
             <button class="role-btn selected" id="roleBtnPlayer" onclick="selectRole('Player')"><span class="icon">🏃</span><div><b>Player</b><small>Get Discovered</small></div></button>
             <button class="role-btn" id="roleBtnCoach" onclick="selectRole('Coach')"><span class="icon">🧑‍🏫</span><div><b>Coach</b><small>Scout & Train</small></div></button>
+            <button class="role-btn" id="roleBtnClub" onclick="selectRole('Club')"><span class="icon">🏢</span><div><b>Club</b><small>Recruit Squads</small></div></button>
             <button class="role-btn" id="roleBtnOrganizer" onclick="selectRole('Organizer')"><span class="icon">🏆</span><div><b>Organizer</b><small>Host & Verify</small></div></button>
             <button class="role-btn" id="roleBtnReferee" onclick="selectRole('Referee')"><span class="icon">🧑‍⚖️</span><div><b>Referee</b><small>Manage Games</small></div></button>
           </div>
@@ -156,7 +157,7 @@
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="form-group"><label class="form-label">Email</label><input id="regEmail" type="email" class="form-input" placeholder="Email address" required></div>
-            <div class="form-group"><label class="form-label">Password</label><input id="regPassword" type="password" class="form-input" placeholder="Create password" minlength="6" required></div>
+            <div class="form-group"><label class="form-label">Password</label><input id="regPassword" type="password" class="form-input" placeholder="Create password (8+ chars)" minlength="8" required></div>
           </div>
           <div id="registrationRoleDetails"></div>
           <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="handleLandingRegister()">CREATE SPORTSCONNECT ACCOUNT</button>
