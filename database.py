@@ -111,7 +111,7 @@ def init_db(force: bool = False):
 
     schema_sql = """
     CREATE TABLE IF NOT EXISTS users (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
         phone TEXT,
@@ -196,7 +196,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS sports_tests (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL,
         sport TEXT NOT NULL,
         test_name TEXT NOT NULL,
@@ -209,7 +209,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS certificates (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         issuing_org TEXT NOT NULL,
@@ -226,7 +226,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS tournaments (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         organizer_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         sport TEXT NOT NULL,
@@ -241,7 +241,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS matches (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         tournament_id INTEGER,
         sport TEXT NOT NULL,
         title TEXT NOT NULL,
@@ -258,7 +258,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS match_player_stats (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         match_id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         team_name TEXT NOT NULL,
@@ -271,7 +271,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS connections (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         requester_id INTEGER NOT NULL,
         recipient_id INTEGER NOT NULL,
         status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'declined'
@@ -281,7 +281,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS messages (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         sender_id INTEGER NOT NULL,
         recipient_id INTEGER NOT NULL,
         message_text TEXT NOT NULL,
@@ -294,7 +294,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS trials (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         creator_id INTEGER NOT NULL,
         sport TEXT NOT NULL,
         position TEXT NOT NULL,
@@ -309,7 +309,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS trial_applications (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         trial_id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         status TEXT DEFAULT 'invited', -- 'invited', 'accepted', 'declined', 'selected'
@@ -321,7 +321,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS saved_talent (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         notes TEXT,
@@ -332,7 +332,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         category TEXT NOT NULL, -- 'Connections', 'Opportunities', 'Matches', 'Verification', 'Performance', 'Reports', 'Messages', 'System'
         title TEXT NOT NULL,
@@ -344,7 +344,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS reports (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         reporter_id INTEGER NOT NULL,
         reported_user_id INTEGER NOT NULL,
         reported_item_type TEXT NOT NULL, -- 'profile', 'certificate', 'match_stats', 'behavior'
@@ -371,7 +371,7 @@ def init_db(force: bool = False):
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
-        id BIGSERIAL PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         token_hash TEXT UNIQUE NOT NULL,
         user_id INTEGER,
         role TEXT NOT NULL,
@@ -381,7 +381,8 @@ def init_db(force: bool = False):
     );
     """
     if USING_POSTGRES:
-        cursor.execute(schema_sql)
+        postgres_schema = schema_sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY").replace("INTEGER", "BIGINT")
+        cursor.execute(postgres_schema)
     else:
         cursor.executescript(schema_sql)
 
