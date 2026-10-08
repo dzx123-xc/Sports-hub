@@ -16,6 +16,7 @@ ADMIN_PASSWORD=<long random secret>
 SESSION_TTL_HOURS=24
 COOKIE_SECURE=true
 LOG_LEVEL=INFO
+SEED_DEMO_DATA=false
 ```
 
 Railway provides the `PORT` variable automatically. The application listens on `0.0.0.0:$PORT`.
@@ -42,7 +43,7 @@ Expected response:
 
 Create the PostgreSQL project first and copy its PostgreSQL connection string into Railway as `DATABASE_URL`.
 
-The application creates its tables automatically on first startup. No SQLite database file is required.
+The application creates its tables automatically on first startup. No SQLite database file is required. PostgreSQL demo accounts are disabled by default; keep `SEED_DEMO_DATA=false` for a public deployment. Set it to `true` only for a controlled demo environment.
 
 ## Security
 
