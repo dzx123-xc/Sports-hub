@@ -202,16 +202,6 @@ def smart_match(player, criteria):
     final_pct = min(98, max(50, score))
     return final_pct, reasons
 
-def is_admin_request(handler):
-    cookie = handler.headers.get('Cookie', '')
-    token = None
-    for part in cookie.split(';'):
-        part = part.strip()
-        if part.startswith('sc_admin_session='):
-            token = part.split('=', 1)[1]
-            break
-    return bool(token and token in ADMIN_SESSIONS)
-
 class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=BASE_DIR, **kwargs)
@@ -1146,15 +1136,37 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"success": True, "message": "Player invited for trial."})
 
             elif path == '/api/trials/respond':
+                auth_id = current_user_id(self)
                 app_id = body.get('application_id')
                 trial_id = body.get('trial_id')
                 player_id = body.get('player_id')
-                response_status = body.get('status') # 'accepted' or 'declined'
+                response_status = str(body.get('status') or '').strip().lower() # 'accepted' or 'declined'
+
+                if not auth_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
+                if response_status not in ("accepted", "declined"):
+                    return self.send_json({"error": "Invalid trial response status."}, 400)
 
                 if app_id:
+                    cursor.execute("SELECT player_id FROM trial_applications WHERE id = ?", (app_id,))
+                    application = cursor.fetchone()
+                    if not application:
+                        return self.send_json({"error": "Trial application not found."}, 404)
+                    if int(application["player_id"]) != int(auth_id):
+                        return self.send_json({"error": "You can only respond to your own trial applications."}, 403)
                     cursor.execute("UPDATE trial_applications SET status = ? WHERE id = ?", (response_status, app_id))
                 elif trial_id and player_id:
-                    cursor.execute("UPDATE trial_applications SET status = ? WHERE trial_id = ? AND player_id = ?", (response_status, trial_id, player_id))
+                    if int(player_id) != int(auth_id):
+                        return self.send_json({"error": "You can only respond to your own trial applications."}, 403)
+                    cursor.execute(
+                        "UPDATE trial_applications SET status = ? WHERE trial_id = ? AND player_id = ?",
+                        (response_status, trial_id, player_id),
+                    )
+                else:
+                    return self.send_json({"error": "Application or trial/player identifiers are required."}, 400)
+
+                if cursor.rowcount == 0:
+                    return self.send_json({"error": "Trial application not found."}, 404)
                 conn.commit()
                 return self.send_json({"success": True, "status": response_status})
 
@@ -1183,8 +1195,26 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"success": True, "message": "Connection request sent."})
 
             elif path == '/api/connections/respond':
+                auth_id = current_user_id(self)
                 conn_id = body.get('connection_id')
-                status = body.get('status') # 'accepted' or 'declined'
+                status = str(body.get('status') or '').strip().lower() # 'accepted' or 'declined'
+
+                if not auth_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
+                if status not in ("accepted", "declined"):
+                    return self.send_json({"error": "Invalid connection response status."}, 400)
+
+                cursor.execute(
+                    "SELECT requester_id, recipient_id, status FROM connections WHERE id = ?",
+                    (conn_id,),
+                )
+                connection = cursor.fetchone()
+                if not connection:
+                    return self.send_json({"error": "Connection request not found."}, 404)
+                if int(connection["recipient_id"]) != int(auth_id):
+                    return self.send_json({"error": "Only the connection recipient can respond to this request."}, 403)
+                if connection["status"] != "pending":
+                    return self.send_json({"error": "Connection request is no longer pending."}, 409)
 
                 cursor.execute("UPDATE connections SET status = ? WHERE id = ?", (status, conn_id))
                 conn.commit()
