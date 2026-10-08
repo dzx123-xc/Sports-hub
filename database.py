@@ -645,7 +645,7 @@ def seed_demo_data(conn):
     """)
 
     # 18. Privacy Settings
-    for uid in range(1, 11):
+    for uid in range(1, 10):
         cursor.execute("""
         INSERT INTO privacy_settings (user_id, profile_visibility, contact_visibility, stats_visibility, certs_visibility, connections_visibility)
         VALUES (?, 'public', 'connections_only', 'public', 'public', 'public')
