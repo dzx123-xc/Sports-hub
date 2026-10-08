@@ -263,6 +263,26 @@
         </div>
       </div>
 
+      <!-- 4. Active Sessions -->
+      <div class="resume-card" style="padding:28px;" id="secActiveUsers">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 style="font-size:18px;">🟢 Currently Logged-In Users</h3>
+            <p style="font-size:13px; color:var(--text-secondary);">Authenticated users with an active server session. Identity comes from the server session, not browser storage.</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadActiveUsers()">🔄 Refresh</button>
+        </div>
+        <div id="activeUsersMeta" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">Loading active sessions...</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+            <thead><tr style="border-bottom:1px solid var(--border-medium); color:var(--text-muted); font-size:11px; text-transform:uppercase;">
+              <th style="padding:10px;">User</th><th style="padding:10px;">Role</th><th style="padding:10px;">Email</th><th style="padding:10px;">Location</th><th style="padding:10px;">Login Time</th><th style="padding:10px;">Sessions</th>
+            </tr></thead>
+            <tbody id="activeUsersBody"><tr><td colspan="6" style="padding:16px; color:var(--text-muted);">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- 4. User Management -->
       <div class="resume-card" style="padding:28px;" id="secUsers">
         <h3 style="font-size:18px; margin-bottom:14px;">👥 Platform Users & Entity Verification</h3>
@@ -320,8 +340,41 @@
   </div>
 
   <!-- Scripts -->
-  <script src="app.js"></script>
+  <script src="app.js"></script>\n  <script>document.addEventListener('DOMContentLoaded', loadActiveUsers);</script>
   <script>
+    async function loadActiveUsers() {
+      const meta = document.getElementById('activeUsersMeta');
+      const body = document.getElementById('activeUsersBody');
+      try {
+        const response = await fetch('/api/admin/active-users', { credentials: 'include' });
+        if (!response.ok) throw new Error('Unable to load active users');
+        const data = await response.json();
+        meta.textContent = data.count + ' user(s) currently logged in • Checked ' + new Date(data.checked_at).toLocaleString();
+        if (!data.active_users.length) {
+          body.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--text-muted);">No users are currently logged in.</td></tr>';
+          return;
+        }
+        body.innerHTML = data.active_users.map(user => {
+          const location = [user.city, user.district, user.state].filter(Boolean).join(', ') || '—';
+          return '<tr style="border-bottom:1px solid var(--border-subtle);">' +
+            '<td style="padding:10px;"><b>' + escapeHtml(user.full_name || user.username) + '</b><div style="font-size:11px;color:var(--text-muted);">@' + escapeHtml(user.username) + '</div></td>' +
+            '<td style="padding:10px;"><span class="badge">' + escapeHtml(user.role) + '</span></td>' +
+            '<td style="padding:10px;">' + escapeHtml(user.email || '—') + '</td>' +
+            '<td style="padding:10px;">' + escapeHtml(location) + '</td>' +
+            '<td style="padding:10px;">' + escapeHtml(new Date(user.login_at).toLocaleString()) + '</td>' +
+            '<td style="padding:10px;">' + escapeHtml(String(user.active_sessions)) + '</td>' +
+          '</tr>';
+        }).join('');
+      } catch (error) {
+        meta.textContent = 'Could not load active sessions.';
+        body.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--rose);">Active user data unavailable.</td></tr>';
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+
     function showAdminSec(sec) {
       const map = {
         certificates: 'secCertQueue',
