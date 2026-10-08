@@ -142,14 +142,10 @@ const SPORT_ROLES = {
 // 2. DataService (Communicates with REST API, Falls Back to Local Persistence)
 // =============================================================================
 const DataService = {
-  async getMe(userId) {
-    try {
-      const res = await fetch(`/api/auth/me?user_id=${userId}`);
-      if (res.ok) return await res.json();
-    } catch (e) {}
-    // Fallback
-    const u = Object.values(DEMO_USERS).find(x => x.id === parseInt(userId)) || DEMO_USERS.player1;
-    return { user: u };
+  async getMe() {
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) throw new Error('Authentication required');
+    return await res.json();
   },
 
   async getPlayers(params = {}) {
