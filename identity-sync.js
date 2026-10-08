@@ -22,13 +22,13 @@
     const setText=(ids,value)=>{
       ids.forEach(id=>{const el=document.getElementById(id);if(el&&value!==undefined&&value!==null)el.textContent=value;});
     };
-    const location=[user.location,user.district,user.state].filter(Boolean).join(', ');
+    const userLocation=[user.location,user.district,user.state].filter(Boolean).join(', ');
     const sport=merged.sport||user.sport||'';
     const position=merged.position||merged.specialization||merged.official_role||'';
 
     if(expected==='Player'){
       setText(['playerNameTitle','resFullName'],user.full_name||user.username);
-      setText(['playerSubtitle'],[sport,position,location].filter(Boolean).join(' | '));
+      setText(['playerSubtitle'],[sport,position,userLocation].filter(Boolean).join(' | '));
     }
     if(expected==='Coach'){
       setText(['coachWelcomeName','headerName','sideName'],user.full_name||user.username);
@@ -42,13 +42,13 @@
     }
     if(expected==='Referee'){
       setText(['sideName','dashboardName','headerName','profileName'],user.full_name||user.username);
-      setText(['sideLocation','profileLocation'],location||'Complete profile');
+      setText(['sideLocation','profileLocation'],userLocation||'Complete profile');
     }
 
     document.querySelectorAll('[data-current-user-name]').forEach(e=>e.textContent=user.full_name||'');
     document.querySelectorAll('[data-current-user-email]').forEach(e=>e.textContent=user.email||'');
     document.querySelectorAll('[data-current-user-role]').forEach(e=>e.textContent=user.role||'');
-    document.querySelectorAll('[data-current-user-location]').forEach(e=>e.textContent=location);
+    document.querySelectorAll('[data-current-user-location]').forEach(e=>e.textContent=userLocation);
   }catch(e){
     location.replace('/');
   }
