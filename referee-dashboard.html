@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SportHub | Referee Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-role="Referee">
+<div class="page-bg"></div><div class="bg-overlay"></div>
+<div id="dashboardRoot" class="standalone-dashboard">
+  <div class="dash-shell">
+    <aside class="dash-sidebar" id="sidebar">
+      <div class="dash-brand"><span>🏆</span><div><b>Sport<span>Hub</span></b><small id="sideRole">REFEREE</small></div></div>
+      <div class="side-profile"><div class="side-avatar" id="sideAvatar">🧑‍⚖️</div><div><b id="sideName">Member</b><small id="sideLocation">Complete profile</small></div></div>
+      <nav id="roleSidebar" class="side-nav"><button onclick="menuAction('Dashboard')"><span>⌂</span><b>Dashboard</b></button><button onclick="menuAction('Referee Profile')"><span>👤</span><b>Referee Profile</b></button><button onclick="menuAction('Assigned Matches')"><span>⚽</span><b>Assigned Matches</b></button><button onclick="menuAction('Schedule')"><span>👥</span><b>Schedule</b></button><button onclick="menuAction('Match Management')"><span>📈</span><b>Match Management</b></button><button onclick="menuAction('Statistics')"><span>🏆</span><b>Statistics</b></button><button onclick="menuAction('History')"><span>🔎</span><b>History</b></button><button onclick="menuAction('Community')"><span>💬</span><b>Community</b></button><button onclick="menuAction('Notifications')"><span>🔔</span><b>Notifications</b></button></nav>
+      <button class="side-logout" onclick="logout()">🚪 <span>Logout</span></button>
+    </aside>
+    <main class="dash-main">
+      <div class="dash-mobile-top"><button onclick="toggleSidebar()">☰</button><b>Sport<span>Hub</span></b><button onclick="logout()">↪</button></div>
+      <header class="dash-header">
+        <div><div class="section-label">REFEREE DASHBOARD</div><h2><span id="dashboardIcon">🧑‍⚖️</span> Welcome, <span id="dashboardName">Member</span></h2><p id="roleDescription">Manage your SportHub activities from one place.</p></div>
+        <div class="header-actions"><button class="icon-action" onclick="scrollToId('notificationsBlock')">🔔<i>3</i></button><button class="profile-pill" onclick="scrollToId('profileBlock')"><span id="headerAvatar">🧑‍⚖️</span><span><b id="headerName">Member</b><small id="dashboardRole">Referee</small></span></button></div>
+      </header>
+      <section id="roleStats" class="stats-grid"></section>
+      <section id="quickActions" class="role-hero-grid"></section>
+      <section class="dash-content-grid">
+        <div class="dashboard-panel wide-panel" id="profileBlock">
+          <div class="panel-heading"><div><div class="panel-title">MY PROFILE</div><h3>Referee information</h3></div><span class="status-chip">● Active</span></div>
+          <form id="profileForm" onsubmit="saveProfile(event)">
+            <div class="profile-form-grid">
+              <input id="profileName" class="detail-input" placeholder="Full name" required>
+              <input id="profilePhone" class="detail-input" placeholder="Phone number" required>
+              <input id="profileEmail" class="detail-input" type="email" placeholder="Email" required>
+              <input id="profileSport" class="detail-input" placeholder="Sport">
+              <input id="profileState" class="detail-input" placeholder="State">
+              <input id="profileDistrict" class="detail-input" placeholder="District">
+              <input id="profileLocation" class="detail-input" placeholder="Area / mandal">
+              <input id="profileVillage" class="detail-input" placeholder="Village / local area">
+              <input id="profileAvailability" class="detail-input" placeholder="Availability">
+              <input id="profileRole" class="detail-input" placeholder="Referee_FIELD">
+              <textarea id="profileBio" class="detail-input textarea full" placeholder="Short bio / about you"></textarea>
+            </div>
+            <button class="green-btn compact" type="submit">Save Profile</button>
+          </form>
+          <p id="profileSummary" class="profile-summary"></p>
+        </div>
+        <div class="dashboard-panel" id="notificationsBlock"><div class="panel-heading"><div><div class="panel-title">NOTIFICATIONS</div><h3>Latest updates</h3></div><span class="count-badge">3</span></div><div id="notificationsList"></div></div>
+        <div class="dashboard-panel wide-panel" id="roleModules"><div class="module-empty"><span>🧑‍⚖️</span><div><b>Loading dashboard modules...</b></div></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="dashboard.js"></script>
+<script>
+function menuAction(name){
+  if(name==='Dashboard') return window.scrollTo({top:0,behavior:'smooth'});
+  if(name.includes('Profile')) return scrollToId('profileBlock');
+  if(name==='Notifications') return scrollToId('notificationsBlock');
+  const index=Referee_INDEX;
+  const i=index[name];
+  if(i!==undefined) openModule(i); else toast(name+' is ready for the next feature phase.');
+}
+</script>
+</body></html>

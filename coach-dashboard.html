@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SportsConnect | Coach Talent Discovery Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-role="Coach">
+
+  <div class="page-bg"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="dash-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="dash-sidebar">
+      <div class="brand">
+        <div class="brand-icon">🏆</div>
+        <div>
+          <div class="brand-name">SPORTS<span>CONNECT</span></div>
+          <div class="brand-tagline">COACH TALENT SCOUT</div>
+        </div>
+      </div>
+
+      <nav class="side-menu">
+        <button class="side-item active" onclick="showCoachSection('scout')">
+          <span class="icon">🔎</span> Find Players & Scout
+        </button>
+        <button class="side-item" onclick="showCoachSection('rising')">
+          <span class="icon">🌟</span> Rising Talent Stream
+        </button>
+        <button class="side-item" onclick="showCoachSection('matching')">
+          <span class="icon">🎯</span> Smart Match Engine
+        </button>
+        <button class="side-item" onclick="showCoachSection('saved')">
+          <span class="icon">⭐</span> Saved Talent (<span id="savedCountBadge">3</span>)
+        </button>
+        <button class="side-item" onclick="showCoachSection('trials')">
+          <span class="icon">🏏</span> Manage Trials
+        </button>
+        <button class="side-item" onclick="showCoachSection('messages')">
+          <span class="icon">💬</span> Athlete Messaging
+        </button>
+      </nav>
+
+      <div style="margin-top:auto; padding-top:16px; border-top:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="UIController.toggleTheme()">🌓 Toggle Mode</button>
+        <button class="btn btn-secondary btn-sm" onclick="SessionManager.logout()">🚪 Log Out</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="dash-main">
+      <!-- Topbar Header -->
+      <div class="dash-topbar">
+        <div class="dash-welcome">
+          <h2>
+            <span>🧑‍🏫</span> <span id="coachWelcomeName">Coach</span>
+            <span class="badge badge-verified">🟢 Coach Account</span>
+          </h2>
+          <p id="coachWelcomeMeta">Your registered Coach profile</p>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn btn-outline btn-sm" onclick="UIController.openNotificationsModal()" title="Notifications">
+            🔔 <span class="badge badge-verified" style="padding:1px 5px; font-size:10px;">2</span>
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openMessagesModal('Rahul Kumar', 'Batsman (Rising Talent)')">
+            💬 Messages
+          </button>
+          <button class="btn btn-gold btn-sm" onclick="UIController.openComparisonModal(DEMO_USERS.player1, DEMO_USERS.player2)">
+            ⚖️ Compare Players
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="openCreateTrialModal()">
+            + Post Trial Session
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Summary -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Rising Talent Tracked</span>
+            <span>🌟</span>
+          </div>
+          <div class="kpi-value" style="color:var(--gold);">14</div>
+          <div class="kpi-subtitle">High skill & verified potential</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Saved Prospects</span>
+            <span>⭐</span>
+          </div>
+          <div class="kpi-value" style="color:var(--primary);">3</div>
+          <div class="kpi-subtitle">In recruitment shortlist</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Active Trials</span>
+            <span>🏏</span>
+          </div>
+          <div class="kpi-value">2</div>
+          <div class="kpi-subtitle">State Selection Combines</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Verified Evaluator</span>
+            <span>✓</span>
+          </div>
+          <div class="kpi-value" style="font-size:20px; color:var(--cyan);">BCCI Level 2</div>
+          <div class="kpi-subtitle">Authorized skill test recorder</div>
+        </div>
+      </div>
+
+      <!-- Advanced Search & Filter Section -->
+      <div class="resume-card" style="padding:24px; margin-bottom:28px;" id="secSearch">
+        <h3 style="font-size:18px; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+          <span>🔎</span> Advanced Talent Search & Discovery
+        </h3>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+          <div>
+            <label class="form-label">Sport</label>
+            <select id="scoutSport" class="form-select" onchange="filterScoutPlayers()">
+              <option value="Cricket">Cricket</option>
+              <option value="Football">Football</option>
+              <option value="All">All Sports</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Role / Position</label>
+            <select id="scoutPosition" class="form-select" onchange="filterScoutPlayers()">
+              <option value="All">All Positions</option>
+              <option value="Batsman">Batsman</option>
+              <option value="Bowler">Bowler</option>
+              <option value="All-rounder">All-rounder</option>
+              <option value="Wicketkeeper">Wicketkeeper</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Classification</label>
+            <select id="scoutClass" class="form-select" onchange="filterScoutPlayers()">
+              <option value="All">All Classifications</option>
+              <option value="Rising Talent" selected>🌟 Rising Talent</option>
+              <option value="Emerging Player">📈 Emerging Player</option>
+              <option value="Established Player">⭐ Established Player</option>
+              <option value="Elite Player">🏆 Elite Player</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Min Skill Score</label>
+            <select id="scoutMinSkill" class="form-select" onchange="filterScoutPlayers()">
+              <option value="0">Any Score</option>
+              <option value="80" selected>80+ (High Skill)</option>
+              <option value="85">85+ (Elite Potential)</option>
+              <option value="90">90+ (Mastery)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Location</label>
+            <input id="scoutLocation" class="form-input" placeholder="e.g. Hyderabad" value="Hyderabad" oninput="filterScoutPlayers()">
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <span style="font-size:13px; color:var(--text-muted);" id="resultsCountText">Showing 2 matches for criteria</span>
+          <button class="btn btn-gold btn-sm" onclick="runSmartMatchFromSearch()">
+            🎯 Run Smart Match Engine
+          </button>
+        </div>
+      </div>
+
+      <!-- Player Cards Search Stream -->
+      <div id="scoutPlayerGrid" class="talent-grid" style="margin-bottom:36px;">
+        <!-- Player 1 -->
+        <div class="talent-card" data-sport="Cricket" data-position="Batsman" data-class="Rising Talent" data-skill="88">
+          <div class="talent-header">
+            <div class="talent-avatar">🏏</div>
+            <div class="talent-meta">
+              <h4>Rahul Kumar <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Cricket • Batsman • Hyderabad</div>
+              <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+            </div>
+          </div>
+
+          <div class="talent-metrics-row">
+            <div class="metric-box">
+              <strong>88/100</strong>
+              <small>Skill Score</small>
+            </div>
+            <div class="metric-box">
+              <strong>86/100</strong>
+              <small>Match Perf</small>
+            </div>
+            <div class="metric-box">
+              <strong class="progress-up">+21%</strong>
+              <small>Progress</small>
+            </div>
+          </div>
+
+          <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between;">
+            <span>Major Matches: <b>0</b></span>
+            <span>Verified Local: <b>6</b></span>
+            <span style="color:var(--primary);">🟢 Available</span>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player1')">
+              View Profile
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="invitePlayerForTrial('Rahul Kumar')">
+              Invite for Trial 🏏
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="toggleSavePlayer(this, 'Rahul Kumar')" title="Save Talent">
+              ⭐
+            </button>
+          </div>
+        </div>
+
+        <!-- Player 2 -->
+        <div class="talent-card" data-sport="Cricket" data-position="Bowler" data-class="Rising Talent" data-skill="87">
+          <div class="talent-header">
+            <div class="talent-avatar">🏏</div>
+            <div class="talent-meta">
+              <h4>Kiran Kumar <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Cricket • Bowler • Secunderabad</div>
+              <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+            </div>
+          </div>
+
+          <div class="talent-metrics-row">
+            <div class="metric-box">
+              <strong>87/100</strong>
+              <small>Skill Score</small>
+            </div>
+            <div class="metric-box">
+              <strong>85/100</strong>
+              <small>Match Perf</small>
+            </div>
+            <div class="metric-box">
+              <strong class="progress-up">+19%</strong>
+              <small>Progress</small>
+            </div>
+          </div>
+
+          <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between;">
+            <span>Major Matches: <b>0</b></span>
+            <span>Verified Local: <b>5</b></span>
+            <span style="color:var(--primary);">🟢 Available</span>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player3')">
+              View Profile
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="invitePlayerForTrial('Kiran Kumar')">
+              Invite for Trial 🏏
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="toggleSavePlayer(this, 'Kiran Kumar')" title="Save Talent">
+              ⭐
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Smart Matching Engine Showcase -->
+      <div class="resume-card" style="padding:28px;" id="secMatching">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 style="font-size:18px; display:flex; align-items:center; gap:8px;">
+              <span>🎯</span> Smart Talent Recommendation Engine
+            </h3>
+            <p style="font-size:13px; color:var(--text-secondary);">
+              Target Requirement: <b>Cricket &bull; Batsman &bull; Hyderabad &bull; Skill 80+ &bull; Available</b>
+            </p>
+          </div>
+          <span class="badge badge-verified">Algorithmic Recommendation</span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;" id="smartMatchListContainer">
+          <!-- Item 1: 94% Match -->
+          <div style="background:var(--bg-surface-elevated); border:1px solid rgba(0,210,255,0.3); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <h4 style="font-size:17px;">Rahul Kumar</h4>
+                <span class="badge badge-rising">🌟 Rising Talent</span>
+                <span style="font-size:18px; font-weight:900; color:var(--cyan); margin-left:8px;">94% Match</span>
+              </div>
+              <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                ✓ Same sport &bull; ✓ Same role &bull; ✓ Same location &bull; ✓ Skill score 88/100 &bull; ✓ Available &bull; ✓ +21% progress
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-outline btn-sm" onclick="inspectMatchWhy(94, 'Rahul Kumar')">
+                Why 94% Match? ➔
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="invitePlayerForTrial('Rahul Kumar')">
+                Invite for Trial
+              </button>
+            </div>
+          </div>
+
+          <!-- Item 2: 91% Match -->
+          <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <h4 style="font-size:17px;">Arjun Reddy</h4>
+                <span class="badge badge-emerging">Emerging Player</span>
+                <span style="font-size:18px; font-weight:900; color:var(--cyan); margin-left:8px;">91% Match</span>
+              </div>
+              <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                ✓ Same sport &bull; ✓ All-rounder capability &bull; ✓ Same location &bull; ✓ Skill score 84/100
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-outline btn-sm" onclick="inspectMatchWhy(91, 'Arjun Reddy')">
+                Why 91% Match? ➔
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="invitePlayerForTrial('Arjun Reddy')">
+                Invite for Trial
+              </button>
+            </div>
+          </div>
+
+          <!-- Item 3: 87% Match -->
+          <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <h4 style="font-size:17px;">Kiran Kumar</h4>
+                <span class="badge badge-rising">🌟 Rising Talent</span>
+                <span style="font-size:18px; font-weight:900; color:var(--cyan); margin-left:8px;">87% Match</span>
+              </div>
+              <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                ✓ Same sport &bull; Bowler pairing &bull; ✓ Location Secunderabad/Hyderabad &bull; ✓ Skill score 87/100
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-outline btn-sm" onclick="inspectMatchWhy(87, 'Kiran Kumar')">
+                Why 87% Match? ➔
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="invitePlayerForTrial('Kiran Kumar')">
+                Invite for Trial
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Saved Talent Shortlist -->
+      <div class="resume-card" style="padding:28px;" id="secSaved">
+        <h3 style="font-size:18px; margin-bottom:8px;">⭐ Saved Talent Shortlist</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:18px;">
+          Athletes bookmarked for upcoming selection trials.
+        </p>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+          <div style="background:var(--bg-surface-elevated); padding:18px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+            <div style="display:flex; justify-content:space-between;">
+              <h4 style="font-size:16px;">⭐ Rahul Kumar</h4>
+              <span class="badge badge-rising">🌟 Rising Talent</span>
+            </div>
+            <p style="font-size:12.5px; color:var(--text-secondary); margin:6px 0 10px;">
+              Notes: High priority batting talent. Outstanding boundary conversion rate and 91 batting accuracy.
+            </p>
+            <button class="btn btn-primary btn-sm" style="width:100%;" onclick="SessionManager.switchDemoUser('player1')">
+              Open Full Resume
+            </button>
+          </div>
+
+          <div style="background:var(--bg-surface-elevated); padding:18px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+            <div style="display:flex; justify-content:space-between;">
+              <h4 style="font-size:16px;">⭐ Arjun Reddy</h4>
+              <span class="badge badge-emerging">Emerging Player</span>
+            </div>
+            <p style="font-size:12.5px; color:var(--text-secondary); margin:6px 0 10px;">
+              Notes: Solid seam-bowling all-rounder for middle overs acceleration.
+            </p>
+            <button class="btn btn-primary btn-sm" style="width:100%;" onclick="SessionManager.switchDemoUser('player2')">
+              Open Full Resume
+            </button>
+          </div>
+
+          <div style="background:var(--bg-surface-elevated); padding:18px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+            <div style="display:flex; justify-content:space-between;">
+              <h4 style="font-size:16px;">⭐ Kiran Kumar</h4>
+              <span class="badge badge-rising">🌟 Rising Talent</span>
+            </div>
+            <p style="font-size:12.5px; color:var(--text-secondary); margin:6px 0 10px;">
+              Notes: Late swing bowler with 94 bowling accuracy. Watch closely in upcoming state trials.
+            </p>
+            <button class="btn btn-primary btn-sm" style="width:100%;" onclick="SessionManager.switchDemoUser('player3')">
+              Open Full Resume
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create Trial Modal -->
+  <div class="modal-overlay" id="createTrialModal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>🏏 Post New Selection Trial</h3>
+        <button class="modal-close" onclick="UIController.closeModal('createTrialModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Trial Title</label>
+          <input id="trialTitle" class="form-input" placeholder="e.g. Under-21 State Super League Scouting Combine" value="Under-21 State Super League Scouting Combine">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Sport</label>
+            <select class="form-select"><option>Cricket</option><option>Football</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Target Role</label>
+            <select class="form-select"><option>Batsman</option><option>Bowler</option><option>All-rounder</option></select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Trial Date</label>
+            <input type="date" class="form-input" value="2026-09-22">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time</label>
+            <input type="text" class="form-input" value="08:00 AM">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ground / Venue Location</label>
+          <input class="form-input" value="Rajiv Gandhi Stadium Annex Ground, Hyderabad">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Requirements</label>
+          <input class="form-input" value="Minimum Verified Skill Score 80+, White cricket kit, spikes required.">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-outline" onclick="UIController.closeModal('createTrialModal')">Cancel</button>
+          <button class="btn btn-primary" onclick="submitTrialPost()">Publish Trial ➔</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>/* AUTH_ROLE_GUARD */
+(function(){try{const u=JSON.parse(localStorage.getItem('scUser')||localStorage.getItem('sporthubUser')||'null');if(!u||u.role!=='Coach'){window.location.href='index.html';return;}}catch(e){window.location.href='index.html';}})();
+</script>
+  <script>
+    function loadRealCoachProfile() {
+      let user = null;
+      try { user = JSON.parse(localStorage.getItem('scUser') || 'null'); } catch (e) {}
+      if (!user || user.role !== 'Coach') return;
+      const name = user.full_name || user.name || user.username || 'Coach';
+      const username = user.username ? '@' + user.username : '';
+      const nameEl = document.getElementById('coachWelcomeName');
+      const metaEl = document.getElementById('coachWelcomeMeta');
+      if (nameEl) nameEl.textContent = 'Coach ' + name;
+      if (metaEl) {
+        const details = [username, user.sport, user.city || user.location, user.district, user.state].filter(Boolean);
+        metaEl.textContent = details.length ? details.join(' • ') : 'Your registered Coach profile';
+      }
+    }
+    window.addEventListener('DOMContentLoaded', loadRealCoachProfile);
+
+    function showCoachSection(sec) {
+      const map = {
+        scout: 'secSearch',
+        rising: 'scoutPlayerGrid',
+        matching: 'secMatching',
+        saved: 'secSaved',
+        trials: 'createTrialModal',
+        messages: null
+      };
+
+      document.querySelectorAll('.side-item').forEach(b => b.classList.remove('active'));
+
+      if (sec === 'trials') {
+        openCreateTrialModal();
+      } else if (sec === 'messages') {
+        UIController.showToast('Opening scout messages with Rahul Kumar (72 runs in Final)...');
+      } else if (map[sec]) {
+        document.getElementById(map[sec])?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function filterScoutPlayers() {
+      const role = document.getElementById('scoutPosition').value;
+      const cls = document.getElementById('scoutClass').value;
+      const minSkill = parseFloat(document.getElementById('scoutMinSkill').value);
+
+      let visible = 0;
+      document.querySelectorAll('#scoutPlayerGrid .talent-card').forEach(c => {
+        const cPos = c.dataset.position;
+        const cCls = c.dataset.class;
+        const cSkill = parseFloat(c.dataset.skill);
+
+        let match = true;
+        if (role !== 'All' && cPos !== role) match = false;
+        if (cls !== 'All' && cCls !== cls) match = false;
+        if (cSkill < minSkill) match = false;
+
+        c.style.display = match ? 'flex' : 'none';
+        if (match) visible++;
+      });
+
+      document.getElementById('resultsCountText').textContent = `Showing ${visible} matches for criteria`;
+    }
+
+    function runSmartMatchFromSearch() {
+      document.getElementById('secMatching').scrollIntoView({ behavior: 'smooth' });
+      UIController.showToast('Recalculating Smart Match algorithms across 5 verified factors...');
+    }
+
+    function inspectMatchWhy(pct, name) {
+      const matchObj = {
+        player: name === 'Rahul Kumar' ? DEMO_USERS.player1 : (name === 'Arjun Reddy' ? DEMO_USERS.player2 : DEMO_USERS.player3),
+        match_pct: pct,
+        reasons: [
+          'Same sport: Cricket',
+          'Primary role matches open squad requisition',
+          'Same regional jurisdiction (Hyderabad / Telangana)',
+          `Skill score meets requirement (${pct >= 90 ? '88+' : '84+'})`,
+          'Currently available for trials',
+          'Strong recent verified match performance',
+          '🌟 Rising Talent classification bonus'
+        ]
+      };
+      UIController.openSmartMatchModal(matchObj);
+    }
+
+    function invitePlayerForTrial(playerName) {
+      UIController.showToast(`Trial invitation dispatched to ${playerName}! Notification sent.`);
+    }
+
+    function toggleSavePlayer(btn, playerName) {
+      if (btn.style.color === 'var(--gold)' || btn.textContent.includes('★')) {
+        btn.textContent = '☆';
+        btn.style.color = '';
+        UIController.showToast(`${playerName} removed from saved talent.`);
+      } else {
+        btn.textContent = '★';
+        btn.style.color = 'var(--gold)';
+        UIController.showToast(`⭐ ${playerName} added to Saved Talent shortlist!`);
+      }
+    }
+
+    function openCreateTrialModal() {
+      UIController.openModal('createTrialModal');
+    }
+
+    function submitTrialPost() {
+      const title = document.getElementById('trialTitle').value;
+      UIController.closeModal('createTrialModal');
+      UIController.showToast(`Trial "${title}" created and published to talent matching feed!`, 'success');
+    }
+  </script>
+</body>
+</html>

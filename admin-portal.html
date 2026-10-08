@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SportsConnect | Platform Integrity & Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-role="Admin">
+<script>
+(async function enforceAdminOnly(){
+  try {
+    const r = await fetch('/api/admin/session', { cache: 'no-store', credentials: 'same-origin' });
+    if (!r.ok) { window.location.replace('index.html'); return; }
+  } catch(e) { window.location.replace('index.html'); }
+})();
+</script>
+
+  <div class="page-bg"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="dash-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="dash-sidebar">
+      <div class="brand">
+        <div class="brand-icon">🛡️</div>
+        <div>
+          <div class="brand-name">ADMIN<span>PORTAL</span></div>
+          <div class="brand-tagline">INTEGRITY DESK</div>
+        </div>
+      </div>
+
+      <nav class="side-menu">
+        <button class="side-item active" onclick="showAdminSec('dashboard')">
+          <span class="icon">📊</span> Admin Dashboard
+        </button>
+        <button class="side-item" onclick="showAdminSec('certificates')">
+          <span class="icon">📜</span> Certificate Queue (<span id="pendingCertsBadge" style="color:var(--gold);">1</span>)
+        </button>
+        <button class="side-item" onclick="showAdminSec('reports')">
+          <span class="icon">🚨</span> Reports Queue (<span id="reportsBadge" style="color:var(--rose);">1</span>)
+        </button>
+        <button class="side-item" onclick="showAdminSec('users')">
+          <span class="icon">👥</span> User Management
+        </button>
+        <button class="side-item" onclick="showAdminSec('talent-monitor')">
+          <span class="icon">🌟</span> Rising Talent Monitor
+        </button>
+        <button class="side-item" onclick="showAdminSec('matches')">
+          <span class="icon">🏏</span> Match Scorecard Audit
+        </button>
+      </nav>
+
+      <div style="margin-top:auto; padding-top:16px; border-top:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="UIController.toggleTheme()">🌓 Toggle Mode</button>
+        <button class="btn btn-secondary btn-sm" onclick="SessionManager.logout()">🚪 Log Out</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="dash-main">
+      <div class="dash-topbar">
+        <div class="dash-welcome">
+          <h2>
+            <span>🛡️</span> Chief Sports Verifier (Admin)
+            <span class="badge badge-verified" style="background:rgba(255,184,0,0.2); color:var(--gold); border-color:var(--gold);">Platform Integrity Officer</span>
+          </h2>
+          <p>SportsConnect Data Integrity & Verification Desk &bull; Hyderabad Headquarters</p>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-outline btn-sm" onclick="UIController.openNotificationsModal()" title="Notifications">
+            🔔 <span class="badge badge-rejected" style="padding:1px 5px; font-size:10px;">1</span>
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="window.location.href='index.html'">
+            🌐 Public Landing Page
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Integrity database synchronized with SQLite.', 'success')">
+            🔄 Sync Database
+          </button>
+        </div>
+      </div>
+
+      <!-- Admin KPI Grid -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-header"><span>Total Users</span><span>👥</span></div>
+          <div class="kpi-value" id="kpiTotalUsers">10</div>
+          <div class="kpi-subtitle">5 Players, 1 Coach, 2 Clubs, 1 Org</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--gold);">
+          <div class="kpi-header"><span>Pending Certificates</span><span>📜</span></div>
+          <div class="kpi-value" style="color:var(--gold);" id="kpiPendingCerts">1</div>
+          <div class="kpi-subtitle">Queued for verification audit</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--rose);">
+          <div class="kpi-header"><span>Open Reports</span><span>🚨</span></div>
+          <div class="kpi-value" style="color:var(--rose);" id="kpiOpenReports">1</div>
+          <div class="kpi-subtitle">Report #1024 Under Review</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header"><span>Rising Talent</span><span>🌟</span></div>
+          <div class="kpi-value" style="color:var(--primary);" id="kpiRisingTalent">4</div>
+          <div class="kpi-subtitle">Algorithmic classifications</div>
+        </div>
+      </div>
+
+      <!-- 1. Certificate Verification Queue -->
+      <div class="resume-card" style="padding:28px;" id="secCertQueue">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:18px;">📜 Certificate Verification Queue</h3>
+            <p style="font-size:13px; color:var(--text-secondary);">
+              Review submitted sports credentials. Verified certificates immediately update the athlete's trusted profile and classification score.
+            </p>
+          </div>
+          <span class="badge badge-pending">1 Pending Item</span>
+        </div>
+
+        <div id="certQueueList" style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Pending Cert Card -->
+          <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;" id="pendingCertCard1">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:24px;">🏏</span>
+                <div>
+                  <h4 style="font-size:16px;">State Youth Championship Participation Certificate</h4>
+                  <div style="font-size:13px; color:var(--cyan);">Player: Rahul Kumar (Cricket &bull; Batsman &bull; Hyderabad)</div>
+                </div>
+              </div>
+              <div style="font-size:12.5px; color:var(--text-secondary); margin-top:8px;">
+                <b>Issuing Body:</b> South Zone Sports Federation (2026) &bull; <b>Claim:</b> Semi-Finalist representing Hyderabad Central District
+              </div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">
+                Uploaded Document: <a href="#view" style="color:var(--primary); text-decoration:none;" onclick="UIController.showToast('Displaying certified PDF preview...'); return false;">cert_state_youth_rahul.pdf 📄</a>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:10px;" id="certActions1">
+              <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Inspecting official registry match for cert #2...')">
+                👁️ View File
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="adminRejectCert(1)">
+                ❌ Reject
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="adminVerifyCert(1)">
+                🟢 Verify & Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Report Management Investigation Queue (Section 30 & 38) -->
+      <div class="resume-card" style="padding:28px;" id="secReports">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:18px; display:flex; align-items:center; gap:8px;">
+              <span>🚨</span> Platform Report Investigation Desk
+              <span class="badge badge-pending">Status: Under Review</span>
+            </h3>
+            <p style="font-size:13px; color:var(--text-secondary);">
+              <em>Strict Protocol: A report must NOT automatically punish or remove a user. Admin investigates first before any action.</em>
+            </p>
+          </div>
+          <span class="badge badge-rejected" style="font-size:12px;">Active Case #1024</span>
+        </div>
+
+        <div style="background:var(--bg-surface-elevated); border:1px solid rgba(255,51,102,0.3); border-radius:var(--radius-lg); padding:22px;" id="reportCard1024">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <h4 style="font-size:17px; color:var(--rose);">Report #1024 — Suspected Fake Certificate Claim</h4>
+                <span class="badge badge-pending" id="repStatusBadge">🟡 Under Review</span>
+              </div>
+              <div style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
+                <b>Reporter:</b> Coach Vikram Rathore (Coach) &bull; <b>Reported Entity:</b> Certificate #4 (Private Club Winner)
+              </div>
+              <p style="font-size:13px; color:var(--text-primary); margin-top:8px; line-height:1.5;">
+                <b>Description:</b> Suspicious certificate submitted without valid district council verification stamp and altered year.
+              </p>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+                <b>Audit Evidence:</b> Comparison with official 2024 TCA database records indicates participant was not registered in that bracket.
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:8px; min-width:200px;" id="reportActionButtons">
+              <button class="btn btn-outline btn-sm" onclick="adminReportAction('more_info')">
+                🔵 Request More Info
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="adminReportAction('dismiss')">
+                ⚪ Dismiss Report
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="adminReportAction('reject_cert')">
+                ❌ Reject Certificate Only
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="adminReportAction('resolve')">
+                🟢 Mark Case Resolved
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Rising Talent Integrity Monitor (Section 39) -->
+      <div class="resume-card" style="padding:28px;" id="secTalentMonitor">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:18px;">🌟 Rising Talent Integrity Monitor</h3>
+            <p style="font-size:13px; color:var(--text-secondary);">
+              Transparent algorithmic breakdown ensuring classifications are earned through verified skill and progress, not favorites.
+            </p>
+          </div>
+          <span class="badge badge-verified">Formula: Skill(30%) + Perf(30%) + Progress(20%) + Exp(10%) + Certs(10%)</span>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border-medium); color:var(--text-muted); font-size:11px; text-transform:uppercase;">
+                <th style="padding:10px;">Player</th>
+                <th style="padding:10px;">Sport / Role</th>
+                <th style="padding:10px;">Skill Score (30%)</th>
+                <th style="padding:10px;">Match Perf (30%)</th>
+                <th style="padding:10px;">Progress (20%)</th>
+                <th style="padding:10px;">Major Matches (10%)</th>
+                <th style="padding:10px;">Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:12px 10px;"><b>Rahul Kumar</b></td>
+                <td style="padding:12px 10px;">Cricket (Batsman)</td>
+                <td style="padding:12px 10px; color:var(--primary); font-weight:700;">88/100</td>
+                <td style="padding:12px 10px;">86/100</td>
+                <td style="padding:12px 10px;" class="progress-up">+21%</td>
+                <td style="padding:12px 10px;">0 (Low)</td>
+                <td style="padding:12px 10px;"><span class="badge badge-rising">🌟 Rising Talent</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:12px 10px;"><b>Kiran Kumar</b></td>
+                <td style="padding:12px 10px;">Cricket (Bowler)</td>
+                <td style="padding:12px 10px; color:var(--primary); font-weight:700;">87/100</td>
+                <td style="padding:12px 10px;">85/100</td>
+                <td style="padding:12px 10px;" class="progress-up">+19%</td>
+                <td style="padding:12px 10px;">0 (Low)</td>
+                <td style="padding:12px 10px;"><span class="badge badge-rising">🌟 Rising Talent</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:12px 10px;"><b>Arjun Reddy</b></td>
+                <td style="padding:12px 10px;">Cricket (All-rounder)</td>
+                <td style="padding:12px 10px; color:var(--cyan); font-weight:700;">84/100</td>
+                <td style="padding:12px 10px;">81/100</td>
+                <td style="padding:12px 10px;" class="progress-up">+15%</td>
+                <td style="padding:12px 10px;">4 (Moderate)</td>
+                <td style="padding:12px 10px;"><span class="badge badge-emerging">📈 Emerging Player</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 4. User Management -->
+      <div class="resume-card" style="padding:28px;" id="secUsers">
+        <h3 style="font-size:18px; margin-bottom:14px;">👥 Platform Users & Entity Verification</h3>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border-medium); color:var(--text-muted); font-size:11px; text-transform:uppercase;">
+                <th style="padding:10px;">Name</th>
+                <th style="padding:10px;">Role</th>
+                <th style="padding:10px;">Sport / Org</th>
+                <th style="padding:10px;">Verification Status</th>
+                <th style="padding:10px;">Account Status</th>
+                <th style="padding:10px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:10px;">Rahul Kumar</td>
+                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Player</span></td>
+                <td style="padding:10px;">Cricket</td>
+                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified</span></td>
+                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
+                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('player1')">View Profile</button></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:10px;">Vikram Rathore</td>
+                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Coach</span></td>
+                <td style="padding:10px;">Cricket &bull; BCCI Level 2</td>
+                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified Coach</span></td>
+                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
+                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('coach')">View Profile</button></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:10px;">Hyderabad Warriors CC</td>
+                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Club</span></td>
+                <td style="padding:10px;">Cricket &bull; Div 1</td>
+                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified Club</span></td>
+                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
+                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('club')">View Profile</button></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle);">
+                <td style="padding:10px;">Telangana Youth Sports Council</td>
+                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Organizer</span></td>
+                <td style="padding:10px;">Multi-Sport &bull; State Apex</td>
+                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified Organizer</span></td>
+                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
+                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('organizer')">View Profile</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>
+    function showAdminSec(sec) {
+      const map = {
+        certificates: 'secCertQueue',
+        reports: 'secReports',
+        users: 'secUsers',
+        'talent-monitor': 'secTalentMonitor',
+        matches: 'secCertQueue'
+      };
+      if (map[sec]) document.getElementById(map[sec])?.scrollIntoView({ behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function adminVerifyCert(id) {
+      document.getElementById('certActions1').innerHTML = `
+        <span class="badge badge-verified" style="font-size:13px; padding:6px 14px;">
+          ✓ Verified by Admin! Notification dispatched.
+        </span>
+      `;
+      document.getElementById('pendingCertsBadge').textContent = '0';
+      document.getElementById('kpiPendingCerts').textContent = '0';
+      UIController.showToast('Certificate verified! Athlete achievements & classification recalculated.', 'success');
+    }
+
+    function adminRejectCert(id) {
+      document.getElementById('certActions1').innerHTML = `
+        <span class="badge badge-rejected" style="font-size:13px; padding:6px 14px;">
+          ❌ Certificate Rejected
+        </span>
+      `;
+      document.getElementById('pendingCertsBadge').textContent = '0';
+      document.getElementById('kpiPendingCerts').textContent = '0';
+      UIController.showToast('Certificate rejected. Reason logged in audit records.');
+    }
+
+    function adminReportAction(action) {
+      const statusBadge = document.getElementById('repStatusBadge');
+      const actionBox = document.getElementById('reportActionButtons');
+
+      if (action === 'more_info') {
+        statusBadge.className = 'badge badge-emerging';
+        statusBadge.textContent = '🔵 More Info Requested';
+        UIController.showToast('Inquiry sent to South Zone Sports Federation registry.');
+      } else if (action === 'dismiss') {
+        statusBadge.className = 'badge';
+        statusBadge.style.background = 'rgba(255,255,255,0.1)';
+        statusBadge.textContent = '⚪ Dismissed';
+        UIController.showToast('Report dismissed after review.');
+      } else if (action === 'reject_cert') {
+        statusBadge.className = 'badge badge-verified';
+        statusBadge.textContent = '🟢 Resolved (Certificate Rejected)';
+        UIController.showToast('Disputed certificate rejected and purged from trusted achievements.');
+      } else {
+        statusBadge.className = 'badge badge-verified';
+        statusBadge.textContent = '🟢 Case Resolved';
+        UIController.showToast('Investigation concluded. No violations found.');
+      }
+
+      actionBox.innerHTML = `<span class="badge badge-verified" style="font-size:13px; padding:8px 14px;">Audit Complete</span>`;
+      document.getElementById('reportsBadge').textContent = '0';
+      document.getElementById('kpiOpenReports').textContent = '0';
+    }
+  </script>
+</body>
+</html>

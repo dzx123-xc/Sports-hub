@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SportsConnect | Club Operations & Recruitment Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-role="Club">
+
+  <div class="page-bg"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="dash-layout">
+    <!-- Sidebar -->
+    <aside class="dash-sidebar">
+      <div class="brand">
+        <div class="brand-icon">🛡️</div>
+        <div>
+          <div class="brand-name">WARRIORS<span>CC</span></div>
+          <div class="brand-tagline">CLUB OPERATIONS</div>
+        </div>
+      </div>
+
+      <nav class="side-menu">
+        <button class="side-item active" onclick="showClubSec('roster')">
+          <span class="icon">👥</span> Squad & Roster
+        </button>
+        <button class="side-item" onclick="showClubSec('recruitment')">
+          <span class="icon">🔎</span> Player Recruitment
+        </button>
+        <button class="side-item" onclick="showClubSec('rising')">
+          <span class="icon">🌟</span> Rising Talent Pool
+        </button>
+        <button class="side-item" onclick="showClubSec('trials')">
+          <span class="icon">🏏</span> Club Trials (1 Active)
+        </button>
+        <button class="side-item" onclick="showClubSec('analytics')">
+          <span class="icon">📊</span> Team Performance
+        </button>
+        <button class="side-item" onclick="showClubSec('messages')">
+          <span class="icon">💬</span> Recruitment Inquiries
+        </button>
+      </nav>
+
+      <div style="margin-top:auto; padding-top:16px; border-top:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="UIController.toggleTheme()">🌓 Toggle Mode</button>
+        <button class="btn btn-secondary btn-sm" onclick="SessionManager.logout()">🚪 Log Out</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="dash-main">
+      <div class="dash-topbar">
+        <div class="dash-welcome">
+          <h2>
+            <span>🛡️</span> <span id="clubWelcomeName">Hyderabad Warriors CC</span>
+            <span class="badge badge-verified">🟢 Verified Club</span>
+          </h2>
+          <p id="clubWelcomeMeta">Your registered Club profile</p>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-outline btn-sm" onclick="UIController.openNotificationsModal()" title="Notifications">
+            🔔 <span class="badge badge-verified" style="padding:1px 5px; font-size:10px;">2</span>
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openMessagesModal('Rahul Kumar', 'Prospect Opening Batsman')">
+            💬 Inquiries
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openComparisonModal(DEMO_USERS.player1, DEMO_USERS.player2)">
+            ⚖️ Compare Recruits
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Opening trial invitation composer...')">
+            + Invite Athlete
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Grid -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-header"><span>Active Squad</span><span>👥</span></div>
+          <div class="kpi-value">16</div>
+          <div class="kpi-subtitle">Division 1 Registered Roster</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header"><span>Open Trial Slots</span><span>⚡</span></div>
+          <div class="kpi-value" style="color:var(--primary);">12</div>
+          <div class="kpi-subtitle">Under-23 Batting Combine</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header"><span>Win Rate (2026)</span><span>🏆</span></div>
+          <div class="kpi-value" style="color:var(--cyan);">83.3%</div>
+          <div class="kpi-subtitle">T20 Championship Winners</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-header"><span>Scouted Rising Talent</span><span>🌟</span></div>
+          <div class="kpi-value" style="color:var(--gold);">8</div>
+          <div class="kpi-subtitle">Shortlisted from district finals</div>
+        </div>
+      </div>
+
+      <!-- Squad Roster Management -->
+      <div class="resume-card" style="padding:28px;" id="secRoster">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="font-size:18px;">Active Team Members (Verified Match Roster)</h3>
+          <span class="badge badge-verified">Official Squad</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+          <div style="background:var(--bg-surface-elevated); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); display:flex; align-items:center; gap:12px;">
+            <div style="font-size:32px;">🏏</div>
+            <div style="flex:1;">
+              <h4 style="font-size:15px;">Rahul Kumar <span class="badge badge-rising">Rising Talent</span></h4>
+              <div style="font-size:12px; color:var(--cyan);">Opening Batsman &bull; 72 runs in Final</div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Overall Skill: 88/100 &bull; Available for Contract</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('player1')">Profile</button>
+          </div>
+
+          <div style="background:var(--bg-surface-elevated); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); display:flex; align-items:center; gap:12px;">
+            <div style="font-size:32px;">🏏</div>
+            <div style="flex:1;">
+              <h4 style="font-size:15px;">Arjun Reddy <span class="badge badge-emerging">Emerging</span></h4>
+              <div style="font-size:12px; color:var(--text-secondary);">All-rounder &bull; 48 runs, 2 wickets</div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Skill: 84/100 &bull; Contracted Member</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('player2')">Profile</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recruitment & Trial Pipeline -->
+      <div class="resume-card" style="padding:28px;" id="secTrials">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:18px;">Under-23 State League Selection Trials</h3>
+            <p style="font-size:13px; color:var(--text-secondary);">
+              Target: Top-Order Batsman &bull; Date: 20 September 2026 &bull; Rajiv Gandhi Annex
+            </p>
+          </div>
+          <span class="badge badge-verified">Registration Open</span>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.2); padding:16px; border-radius:var(--radius-md); margin-bottom:14px;">
+          <h4 style="font-size:14px; margin-bottom:8px;">Invited Prospects & Responses</h4>
+          <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg-surface); border-radius:var(--radius-sm);">
+              <span>🏏 Rahul Kumar (Skill: 88, 94% Smart Match)</span>
+              <span class="badge badge-verified">✓ Accepted</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 12px; background:var(--bg-surface); border-radius:var(--radius-sm);">
+              <span>🏏 Kiran Kumar (Skill: 87, Bowler Trial Candidate)</span>
+              <span class="badge badge-pending">🟡 Invitation Sent</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Opening talent scout search...')">
+          + Scout Additional Candidates
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>/* AUTH_ROLE_GUARD */
+(function(){try{const u=JSON.parse(localStorage.getItem('scUser')||localStorage.getItem('sporthubUser')||'null');if(!u||u.role!=='Club'){window.location.href='index.html';return;}}catch(e){window.location.href='index.html';}})();
+</script>
+  <script>
+    function showClubSec(sec) {
+      if (sec === 'recruitment' || sec === 'rising') {
+        SessionManager.switchDemoUser('coach');
+      } else if (sec === 'messages') {
+        UIController.showToast('Opening club communications...');
+      } else {
+        UIController.showToast('Switched view.');
+      }
+    }
+  </script>
+</body>
+</html>

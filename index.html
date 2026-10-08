@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SportsConnect | The LinkedIn for Sports — Connect. Perform. Get Discovered.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Dynamic Stadium Backdrop -->
+  <div class="page-bg"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <a class="brand" href="#home">
+      <div class="brand-icon">🏆</div>
+      <div>
+        <div class="brand-name">SPORTS<span>CONNECT</span></div>
+        <div class="brand-tagline">Connect • Perform • Get Discovered</div>
+      </div>
+    </a>
+
+    <nav class="main-nav">
+      <a href="#home" class="active">Home</a>
+      <a href="discover.html?tab=players">Players</a>
+      <a href="discover.html?tab=coaches">Coaches</a>
+      <a href="discover.html?tab=clubs">Clubs</a>
+      <a href="discover.html?tab=tournaments">Tournaments</a>
+      <a href="discover.html?tab=rising" class="highlight">🌟 Rising Talent</a>
+      <a href="#features">Features</a>
+    </nav>
+
+    <div class="nav-actions">
+      <button class="btn btn-outline btn-sm" onclick="UIController.toggleTheme()" title="Toggle Dark/Light Mode">🌓 Mode</button>
+      <button class="btn btn-outline" onclick="openAuthModal('login')">Login</button>
+      <button class="btn btn-primary" onclick="openAuthModal('register')">Get Started</button>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main id="home">
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-eyebrow">
+          <span>⚡</span> THE PROFESSIONAL SPORTS NETWORK
+        </div>
+
+        <h1 class="hero-title">
+          Connect. Perform.<br>
+          <span class="accent">Get Discovered.</span>
+        </h1>
+
+        <div class="hero-tagline">
+          The LinkedIn for Sports — built on verified performance and raw potential.
+        </div>
+
+        <p class="hero-description">
+          A modern ecosystem connecting <b>Players, Coaches, Clubs, and Tournament Organizers</b> through certified match statistics, structured sports tests, and measurable improvement. 
+          Discover promising talent regardless of prior fame.
+        </p>
+
+        <div class="hero-actions">
+          <button class="btn btn-primary" onclick="openAuthModal('register')">
+            Get Started Free ➔
+          </button>
+          <a href="#rising-talent" class="btn btn-gold">
+            🌟 Explore Rising Talent
+          </a>
+          <button class="btn btn-secondary" onclick="openAuthModal('login')">
+            Sign In to Portal
+          </button>
+        </div>
+
+        <div class="sports-ticker">
+          <span class="sport-pill">🏏 Cricket</span>
+          <span class="sport-pill">⚽ Football</span>
+          <span class="sport-pill">🏀 Basketball</span>
+          <span class="sport-pill">🏸 Badminton</span>
+          <span class="sport-pill">🎾 Tennis</span>
+          <span class="sport-pill">🏃 Athletics</span>
+          <span class="sport-pill">🤼 Wrestling</span>
+          <span class="sport-pill">🏊 Swimming</span>
+        </div>
+      </div>
+
+      <!-- Hero Interactive Card (Fast Access & Auth) -->
+      <div class="auth-box" id="heroAuthCard">
+        <div class="auth-tabs">
+          <button id="tabLogin" class="auth-tab active" onclick="switchLandingTab('login')">Sign In</button>
+          <button id="tabRegister" class="auth-tab" onclick="switchLandingTab('register')">Create Account</button>
+          <button id="tabAdmin" class="auth-tab" onclick="switchLandingTab('admin')">Admin</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="landingLoginView">
+          <div class="form-group">
+            <label class="form-label">Email, Mobile, or Username</label>
+            <input id="loginIdent" class="form-input" placeholder="e.g. rahul@sportsconnect.com" value="rahul@sportsconnect.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input id="loginPass" type="password" class="form-input" placeholder="••••••••" value="password123">
+          </div>
+
+          <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="handleLandingLogin()">
+            LOGIN TO SPORTSCONNECT
+          </button>
+
+          <div class="quick-login-pills">
+            <div class="quick-title">⚡ Demo Accounts (optional)</div>
+            <div class="demo-pill-row">
+              <button class="demo-pill" onclick="SessionManager.switchDemoUser('player1')">🧑 Rahul (Rising Talent)</button>
+              <button class="demo-pill" onclick="SessionManager.switchDemoUser('player2')">🧑 Arjun (Emerging)</button>
+              <button class="demo-pill" onclick="SessionManager.switchDemoUser('coach')">🧑‍🏫 Coach Vikram</button>
+              <button class="demo-pill" onclick="SessionManager.switchDemoUser('club')">🛡️ Warriors CC (Club)</button>
+              <button class="demo-pill" onclick="SessionManager.switchDemoUser('organizer')">🏆 Tournament Org</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Login Form -->
+        <div id="landingAdminView" style="display:none;">
+          <div class="quick-title" style="margin-bottom:8px;">🔐 ADMINISTRATOR LOGIN</div>
+          <div class="form-group">
+            <label class="form-label">Admin Username</label>
+            <input id="adminIdent" class="form-input" placeholder="Admin username" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Admin Password</label>
+            <input id="adminPass" type="password" class="form-input" placeholder="Admin password" autocomplete="current-password">
+          </div>
+          <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="handleLandingAdminLogin()">
+            LOGIN AS ADMIN
+          </button>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:10px;">Admin access is restricted to the authorized administrator account.</p>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="landingRegisterView" style="display:none;">
+          <div class="quick-title" style="margin-bottom:8px;">SELECT ACCOUNT TYPE</div>
+          <div class="role-select-grid">
+            <button class="role-btn selected" id="roleBtnPlayer" onclick="selectRole('Player')"><span class="icon">🏃</span><div><b>Player</b><small>Get Discovered</small></div></button>
+            <button class="role-btn" id="roleBtnCoach" onclick="selectRole('Coach')"><span class="icon">🧑‍🏫</span><div><b>Coach</b><small>Scout & Train</small></div></button>
+            <button class="role-btn" id="roleBtnOrganizer" onclick="selectRole('Organizer')"><span class="icon">🏆</span><div><b>Organizer</b><small>Host & Verify</small></div></button>
+            <button class="role-btn" id="roleBtnReferee" onclick="selectRole('Referee')"><span class="icon">🧑‍⚖️</span><div><b>Referee</b><small>Manage Games</small></div></button>
+          </div>
+          <div class="form-group"><label class="form-label">Full Name</label><input id="regName" class="form-input" placeholder="Full name" required></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group"><label class="form-label">Username</label><input id="regUsername" class="form-input" placeholder="Choose username" required></div>
+            <div class="form-group"><label class="form-label">Phone</label><input id="regPhone" class="form-input" placeholder="Phone number" required></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group"><label class="form-label">Email</label><input id="regEmail" type="email" class="form-input" placeholder="Email address" required></div>
+            <div class="form-group"><label class="form-label">Password</label><input id="regPassword" type="password" class="form-input" placeholder="Create password" minlength="6" required></div>
+          </div>
+          <div id="registrationRoleDetails"></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="handleLandingRegister()">CREATE SPORTSCONNECT ACCOUNT</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+
+
+  <!-- Single-page authenticated application -->
+  <section id="indexApp" class="section" style="display:none; padding-top:110px; min-height:80vh;">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">SPORTSCONNECT PORTAL</div>
+        <h2 class="section-title" id="indexAppTitle">Welcome</h2>
+        <p class="section-subtitle" id="indexAppSubtitle">Your account dashboard.</p>
+      </div>
+      <button class="btn btn-outline" onclick="SessionManager.logout()">Logout</button>
+    </div>
+    <div id="indexUserCard" class="feature-card" style="margin-bottom:18px;"></div>
+    <div id="indexRoleNav" class="features-grid"></div>
+    <div id="indexRoleContent" style="margin-top:18px;"></div>
+  </section>
+
+  <!-- Key Features Section -->
+  <section id="features" class="section">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">CORE CAPABILITIES</div>
+        <h2 class="section-title">The Complete Sports Ecosystem</h2>
+        <p class="section-subtitle">
+          Engineered to replace subjective networking with objective, verified athletic records.
+        </p>
+      </div>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">🔎</div>
+        <h3>Discover Players</h3>
+        <p>Filter athletes across sports, positions, verified match performance, certified skills, and trial availability.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">🧑‍🏫</div>
+        <h3>Find Coaches</h3>
+        <p>Connect with accredited coaches, review their coaching credentials, and receive scientific development feedback.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">🏢</div>
+        <h3>Connect with Clubs</h3>
+        <p>Direct pipeline to clubs looking for talent. Receive official trial invitations and squad contracts.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">🏆</div>
+        <h3>Find Tournaments</h3>
+        <p>Discover sanctioned tournaments, track official fixtures, and have authorized match records added to your resume.</p>
+      </div>
+      <div class="feature-card" style="border-color: rgba(255, 184, 0, 0.4);">
+        <div class="feature-icon-wrapper" style="background: rgba(255, 184, 0, 0.15); color: var(--gold); border-color: var(--gold);">🌟</div>
+        <h3>Discover Rising Talent</h3>
+        <p>Our proprietary scoring formula identifies breakout prospects with elite skill tests and improvement regardless of prior fame.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon-wrapper">📊</div>
+        <h3>Analyze Performance</h3>
+        <p>Interactive radar charts, verified match averages, recent form, and data-backed strengths and development areas.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 🌟 Rising Talent Spotlight Section -->
+  <section id="rising-talent" class="section" style="background: rgba(0, 0, 0, 0.25); border-radius: 28px;">
+    <div class="section-header">
+      <div>
+        <div class="section-tag" style="color:var(--gold);">EXCLUSIVE DIFFERENTIATOR</div>
+        <h2 class="section-title">🌟 Rising Talent Spotlight</h2>
+        <p class="section-subtitle">
+          Athletes with exceptional verified skill test scores, high performance in local fixtures, and rapid improvement rates.
+        </p>
+      </div>
+      <div>
+        <button class="btn btn-outline" onclick="SessionManager.switchDemoUser('coach')">
+          Scout All Talent (Coach View) ➔
+        </button>
+      </div>
+    </div>
+
+    <div class="talent-grid">
+      <!-- Player 1: Rahul Kumar -->
+      <div class="talent-card">
+        <div class="talent-header">
+          <div class="talent-avatar">🏏</div>
+          <div class="talent-meta">
+            <h4>Rahul Kumar <span class="badge badge-verified">● Verified</span></h4>
+            <div class="talent-subtitle">Cricket • Batsman • Hyderabad</div>
+            <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+          </div>
+        </div>
+
+        <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+          Top-order opening batsman with exceptional reaction time against seam. 72 runs in District T20 Final.
+        </p>
+
+        <div class="talent-metrics-row">
+          <div class="metric-box">
+            <strong>88/100</strong>
+            <small>Skill Score</small>
+          </div>
+          <div class="metric-box">
+            <strong>86/100</strong>
+            <small>Match Perf</small>
+          </div>
+          <div class="metric-box">
+            <strong class="progress-up">+21%</strong>
+            <small>Progress</small>
+          </div>
+        </div>
+
+        <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between;">
+          <span>Major Matches: <b>0</b></span>
+          <span>Verified Local: <b>6</b></span>
+          <span style="color:var(--primary);">🟢 Available</span>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player1')">
+            View Digital Resume
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openComparisonModal(DEMO_USERS.player1, DEMO_USERS.player2)">
+            Compare ⚖️
+          </button>
+        </div>
+      </div>
+
+      <!-- Player 2: Kiran Kumar -->
+      <div class="talent-card">
+        <div class="talent-header">
+          <div class="talent-avatar">🏏</div>
+          <div class="talent-meta">
+            <h4>Kiran Kumar <span class="badge badge-verified">● Verified</span></h4>
+            <div class="talent-subtitle">Cricket • Bowler • Secunderabad</div>
+            <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+          </div>
+        </div>
+
+        <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+          Right-arm medium pacer with lethal death over yorkers and 94 bowling accuracy assessment.
+        </p>
+
+        <div class="talent-metrics-row">
+          <div class="metric-box">
+            <strong>87/100</strong>
+            <small>Skill Score</small>
+          </div>
+          <div class="metric-box">
+            <strong>85/100</strong>
+            <small>Match Perf</small>
+          </div>
+          <div class="metric-box">
+            <strong class="progress-up">+19%</strong>
+            <small>Progress</small>
+          </div>
+        </div>
+
+        <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between;">
+          <span>Major Matches: <b>0</b></span>
+          <span>Verified Local: <b>5</b></span>
+          <span style="color:var(--primary);">🟢 Available</span>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player3')">
+            View Digital Resume
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openComparisonModal(DEMO_USERS.player1, DEMO_USERS.player3)">
+            Compare ⚖️
+          </button>
+        </div>
+      </div>
+
+      <!-- Player 3: Sunil Varma -->
+      <div class="talent-card">
+        <div class="talent-header">
+          <div class="talent-avatar">⚽</div>
+          <div class="talent-meta">
+            <h4>Sunil Varma <span class="badge badge-verified">● Verified</span></h4>
+            <div class="talent-subtitle">Football • Forward • Bengaluru</div>
+            <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+          </div>
+        </div>
+
+        <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+          Agile striker with explosive acceleration and clinical 89 finishing rating in local youth leagues.
+        </p>
+
+        <div class="talent-metrics-row">
+          <div class="metric-box">
+            <strong>89/100</strong>
+            <small>Skill Score</small>
+          </div>
+          <div class="metric-box">
+            <strong>87/100</strong>
+            <small>Match Perf</small>
+          </div>
+          <div class="metric-box">
+            <strong class="progress-up">+24%</strong>
+            <small>Progress</small>
+          </div>
+        </div>
+
+        <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between;">
+          <span>Major Matches: <b>0</b></span>
+          <span>Verified Local: <b>8</b></span>
+          <span style="color:var(--primary);">🟢 Available</span>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="UIController.showToast('Demo profile for Sunil loaded.')">
+            View Digital Resume
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Trial invite created for Sunil.')">
+            Invite for Trial 🏏
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section id="how-it-works" class="section">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">VERIFIED ECOSYSTEM</div>
+        <h2 class="section-title">The Trust & Discovery Principle</h2>
+        <p class="section-subtitle">
+          "Talent should be discoverable, not just famous." Here is how SportsConnect protects data credibility:
+        </p>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+      <div style="background:var(--bg-surface); padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+        <div style="font-size:24px; margin-bottom:8px;">1️⃣ Structured Skill Tests</div>
+        <p style="font-size:13.5px; color:var(--text-secondary);">
+          Sport-specific assessments (Batting accuracy, reaction time, speed, agility) recorded by certified evaluators.
+        </p>
+      </div>
+      <div style="background:var(--bg-surface); padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+        <div style="font-size:24px; margin-bottom:8px;">2️⃣ Authorized Match Records</div>
+        <p style="font-size:13.5px; color:var(--text-secondary);">
+          Match statistics are submitted exclusively by tournament organizers and clubs, never self-declared by athletes.
+        </p>
+      </div>
+      <div style="background:var(--bg-surface); padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+        <div style="font-size:24px; margin-bottom:8px;">3️⃣ Dynamic Classification</div>
+        <p style="font-size:13.5px; color:var(--text-secondary);">
+          Our weighted algorithm evaluates skill (30%), match performance (30%), and progress (20%), ensuring experience does not dominate.
+        </p>
+      </div>
+      <div style="background:var(--bg-surface); padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+        <div style="font-size:24px; margin-bottom:8px;">4️⃣ Admin Investigation</div>
+        <p style="font-size:13.5px; color:var(--text-secondary);">
+          Any disputed credential undergoes multi-stage verification before approval or disciplinary action is taken.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo Access Panel -->
+  <section id="demo-access" class="section" style="text-align:center; padding-top:20px; padding-bottom:80px;">
+    <div style="background:linear-gradient(145deg, #0f1c35, #081122); border:1px solid var(--border-medium); border-radius:var(--radius-xl); padding:40px 24px; max-width:900px; margin:0 auto;">
+      <h3 style="font-size:26px; font-weight:800; margin-bottom:8px;">Experience All Role Portals</h3>
+      <p style="color:var(--text-secondary); max-width:580px; margin:0 auto 24px; font-size:14px;">
+        SportsConnect provides customized tools for every stakeholder in the sports community. Test each portal with pre-populated realistic data:
+      </p>
+
+      <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:12px;">
+        <button class="btn btn-primary" onclick="SessionManager.switchDemoUser('player1')">
+          🏃 Player Portal (Rahul Kumar)
+        </button>
+        <button class="btn btn-secondary" onclick="SessionManager.switchDemoUser('coach')">
+          🧑‍🏫 Coach Console (Coach Vikram)
+        </button>
+        <button class="btn btn-secondary" onclick="SessionManager.switchDemoUser('club')">
+          🏢 Club Hub (Hyderabad Warriors)
+        </button>
+        <button class="btn btn-secondary" onclick="SessionManager.switchDemoUser('organizer')">
+          🏆 Organizer Console (TYSC)
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <footer style="border-top:1px solid var(--border-subtle); padding:32px 4%; text-align:center; color:var(--text-muted); font-size:13px;">
+    <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:8px; font-weight:700; color:var(--text-primary);">
+      <span>🏆</span> SPORTSCONNECT &bull; CONNECT &bull; PERFORM &bull; GET DISCOVERED
+    </div>
+    &copy; 2026 SportsConnect Platform. All rights reserved. Built for fair talent discovery and verified sports records.
+  </footer>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>
+    let selectedRegRole = 'Player';
+    function switchLandingTab(tab) {
+      document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+      document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+      document.getElementById('tabAdmin').classList.toggle('active', tab === 'admin');
+      document.getElementById('landingLoginView').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('landingRegisterView').style.display = tab === 'register' ? 'block' : 'none';
+      document.getElementById('landingAdminView').style.display = tab === 'admin' ? 'block' : 'none';
+      if (tab === 'register') selectRole(selectedRegRole);
+    }
+    async function handleLandingAdminLogin() {
+      const id = document.getElementById('adminIdent').value.trim();
+      const pass = document.getElementById('adminPass').value;
+      if (!id || !pass) { UIController.showToast('Enter Admin username and password.','info'); return; }
+      if (id.toLowerCase() !== 'admin_123') { UIController.showToast('Invalid Admin credentials.','info'); return; }
+      const res = await DataService.login(id, pass);
+      if (res.success && res.user && res.user.role === 'Admin') {
+        SessionManager.setUser(res.user);
+        UIController.showToast('Admin signed in successfully.');
+        showIndexDashboard(res.user);
+      } else {
+        UIController.showToast(res.error || 'Invalid Admin credentials.','info');
+      }
+    }
+    async function handleLandingLogin() {
+      const id=document.getElementById('loginIdent').value.trim(), pass=document.getElementById('loginPass').value.trim();
+      const res=await DataService.login(id,pass);
+      if(res.success&&res.user){SessionManager.setUser(res.user);UIController.showToast('Signed in successfully as '+res.user.full_name);setTimeout(()=>SessionManager.redirectForRole(res.user.role),300);}
+      else if(res.account_exists===false&&id.includes('@')){switchLandingTab('register');document.getElementById('regEmail').value=id.toLowerCase();UIController.showToast('No account found. Create a new SportsConnect account.','info');}
+      else UIController.showToast(res.error||'Login failed','info');
+    }
+    function openAuthModal(mode){switchLandingTab(mode);document.getElementById('heroAuthCard').scrollIntoView({behavior:'smooth',block:'center'});}
+
+    function showIndexDashboard(user) {
+      const app=document.getElementById('indexApp');
+      if(!app || !user) return;
+      const role=String(user.role||'Player');
+      const name=user.full_name||user.name||user.username||'SportHub Member';
+      const username=user.username ? '@'+user.username : '';
+      document.getElementById('indexAppTitle').textContent=`Welcome, ${name}`;
+      document.getElementById('indexAppSubtitle').textContent=`${role} Portal ${username ? '• '+username : ''}`;
+      document.getElementById('indexUserCard').innerHTML=`<div style="display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap"><div><div class="section-tag">SIGNED IN ACCOUNT</div><h3 style="font-size:24px;margin:4px 0">${escapeIndex(name)}</h3><p style="margin:0;color:var(--text-secondary)">${escapeIndex(username)} ${user.email?'• '+escapeIndex(user.email):''}</p></div><div class="badge badge-verified">${escapeIndex(role)}</div></div>`;
+      const modules={
+        Player:[['My Matches','View upcoming games, history and results','📅'],['Performance','Track verified match stats and progress','📈'],['Achievements','Certificates, tests and milestones','🏅'],['Trials','Find and manage trial applications','🎯'],['Network','Messages, connections and discovery','💬'],['Profile','Keep your sports resume updated','👤']],
+        Coach:[['Players','Search and scout registered players','🔎'],['Teams','Manage squad and player development','👥'],['Training','Plan sessions and coaching work','🏋️'],['Performance','Review player statistics and progress','📊'],['Trials','Invite and manage trial applicants','🎯'],['Messages','Communicate with players and clubs','💬']],
+        Organizer:[['Tournaments','Create and manage competitions','🏆'],['Fixtures','Build schedules and match fixtures','🗓️'],['Teams','Manage registered participants','👥'],['Results','Record results and standings','📋'],['Events','Manage sports events and venues','📍'],['Verification','Review match and participant records','✅']],
+        Referee:[['Assigned Matches','View games assigned to you','⚖️'],['Match Details','Open match information and teams','📋'],['Score Entry','Record scores and match outcomes','📝'],['Confirm Result','Submit official result confirmation','✅'],['History','Review completed matches','🕘'],['Profile','Manage official credentials','👤']],
+        Club:[['Recruitment','Discover players and rising talent','🔎'],['Squad','Manage club players','👥'],['Trials','Run trials and applications','🎯'],['Matches','Manage club fixtures and results','⚽'],['Analytics','Review squad performance','📊'],['Messages','Communicate with talent','💬']],
+        Admin:[['Users','Manage registered platform users','👥'],['Reports','Review reported content and cases','🚨'],['Moderation','Maintain platform integrity','🛡️'],['Sports Records','Review verified platform data','📋'],['Notifications','Platform alerts and actions','🔔'],['Administration','Protected system controls','⚙️']]
+      };
+      const items=modules[role]||modules.Player;
+      document.getElementById('indexRoleNav').innerHTML=items.map((m,i)=>`<button class="feature-card" style="text-align:left;cursor:pointer;border:1px solid var(--border-color);" onclick="openIndexModule('${role}',${i})"><div class="feature-icon-wrapper">${m[2]}</div><h3>${m[0]}</h3><p>${m[1]}</p></button>`).join('');
+      document.getElementById('indexRoleContent').innerHTML=`<div class="feature-card"><div class="section-tag">${escapeIndex(role)} WORKSPACE</div><h3 id="indexModuleTitle">Choose a module above</h3><p id="indexModuleText">All authenticated role features now start from index.html. The same logged-in account identity is used throughout this workspace.</p></div>`;
+      app.style.display='block';
+      document.getElementById('home').style.display='none';
+      const features=document.getElementById('features'); if(features) features.style.display='none';
+      const footer=document.querySelector('footer'); if(footer) footer.style.display='none';
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+    function openIndexModule(role,index){
+      const modules={Player:['My Matches','Performance','Achievements','Trials','Network','Profile'],Coach:['Players','Teams','Training','Performance','Trials','Messages'],Organizer:['Tournaments','Fixtures','Teams','Results','Events','Verification'],Referee:['Assigned Matches','Match Details','Score Entry','Confirm Result','History','Profile'],Club:['Recruitment','Squad','Trials','Matches','Analytics','Messages'],Admin:['Users','Reports','Moderation','Sports Records','Notifications','Administration']};
+      const title=(modules[role]||modules.Player)[index]||'Module';
+      document.getElementById('indexModuleTitle').textContent=title;
+      document.getElementById('indexModuleText').textContent=`${title} is opened from the ${role} workspace. This single-page shell is ready to connect each module to the backend APIs without changing the account identity or leaving index.html.`;
+    }
+    function escapeIndex(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+    document.addEventListener('DOMContentLoaded',()=>{
+      const u=SessionManager.getUser&&SessionManager.getUser();
+      if(u) showIndexDashboard(u);
+    });
+  </script>
+>
+</body>
+</html>

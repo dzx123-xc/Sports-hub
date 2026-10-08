@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SportsConnect | Player Digital Sports Resume & Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-role="Player">
+
+  <div class="page-bg"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="dash-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="dash-sidebar">
+      <div class="brand">
+        <div class="brand-icon">🏆</div>
+        <div>
+          <div class="brand-name">SPORTS<span>CONNECT</span></div>
+          <div class="brand-tagline">PLAYER RESUME</div>
+        </div>
+      </div>
+
+      <nav class="side-menu">
+        <button class="side-item active" onclick="showResumeTab('resume')">
+          <span class="icon">👤</span> Digital Sports Resume
+        </button>
+        <button class="side-item" onclick="showResumeTab('tests')">
+          <span class="icon">🎯</span> Sports Tests & Radar
+        </button>
+        <button class="side-item" onclick="showResumeTab('matches')">
+          <span class="icon">🏏</span> Verified Matches
+        </button>
+        <button class="side-item" onclick="showResumeTab('certificates')">
+          <span class="icon">📜</span> Certificates & Badges
+        </button>
+        <button class="side-item" onclick="showResumeTab('progress')">
+          <span class="icon">📈</span> Progress & Analytics
+        </button>
+        <button class="side-item" onclick="showResumeTab('trials')">
+          <span class="icon">⚡</span> Trials & Opportunities
+        </button>
+        <button class="side-item" onclick="showResumeTab('messages')">
+          <span class="icon">💬</span> Messages & Network
+        </button>
+        <button class="side-item" onclick="showResumeTab('privacy')">
+          <span class="icon">⚙️</span> Privacy Settings
+        </button>
+      </nav>
+
+      <div style="margin-top:auto; padding-top:16px; border-top:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="UIController.toggleTheme()">🌓 Toggle Mode</button>
+        <button class="btn btn-secondary btn-sm" onclick="SessionManager.logout()">🚪 Log Out</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="dash-main">
+      <!-- Topbar Header -->
+      <div class="dash-topbar">
+        <div class="dash-welcome">
+          <h2>
+            <span id="playerAvatarIcon">🏏</span> 
+            <span id="playerNameTitle">Rahul Kumar</span>
+            <span class="badge badge-verified" id="playerVerifyBadge">🟢 Verified Player</span>
+          </h2>
+          <p id="playerSubtitle">Cricket | Batsman | Hyderabad, Telangana</p>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:6px; background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); padding:4px 8px; border-radius:var(--radius-md);">
+            <span style="font-size:11px; color:var(--cyan); text-transform:uppercase; font-weight:700;">Athlete:</span>
+            <select id="athleteSwitcher" class="form-select" onchange="loadAthleteProfile(this.value)" style="padding:2px 6px; font-size:12px; background:transparent; border:none; color:var(--text-primary); cursor:pointer;">
+              <option value="1">🏏 Rahul Kumar (Cricket Batsman)</option>
+              <option value="2">🏏 Arjun Reddy (Cricket All-Rounder)</option>
+              <option value="3">🏏 Kiran Kumar (Cricket Bowler)</option>
+              <option value="4">⚽ Sunil Varma (Football Striker)</option>
+              <option value="5">🏸 Ananya Sharma (Badminton Singles)</option>
+            </select>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openNotificationsModal()" title="Notifications">
+            🔔 <span class="badge badge-verified" style="padding:1px 5px; font-size:10px;">3</span>
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="openCertificateUploadModal()">
+            + Upload Certificate
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="UIController.openReportModal('Rahul Kumar', 1, 'profile')" title="Report profile">
+            ⋮ Report
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="UIController.openMessagesModal('Coach Vikram Rathore')">
+            💬 Scout Chat <span class="badge" style="background:#fff; color:#000; padding:1px 5px; font-size:10px; margin-left:4px;">1</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card" style="border-left:4px solid var(--gold);">
+          <div class="kpi-header">
+            <span>Classification</span>
+            <span>🌟</span>
+          </div>
+          <div class="kpi-value" style="font-size:22px; color:var(--gold);" id="kpiClassification">Rising Talent</div>
+          <div class="kpi-subtitle">High skill & progress with low major matches</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Overall Rating</span>
+            <span>⭐</span>
+          </div>
+          <div class="kpi-value" id="kpiRating">8.4<small style="font-size:14px; color:var(--text-muted);">/10</small></div>
+          <div class="kpi-subtitle">Based on verified sports metrics</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Skill Test Score</span>
+            <span>🎯</span>
+          </div>
+          <div class="kpi-value" style="color:var(--primary);" id="kpiSkill">88<small style="font-size:14px;">/100</small></div>
+          <div class="kpi-subtitle">Tested by Coach Vikram Rathore</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span>Improvement</span>
+            <span>📈</span>
+          </div>
+          <div class="kpi-value progress-up" id="kpiProgress">+21%</div>
+          <div class="kpi-subtitle">Progress rate across last 6 months</div>
+        </div>
+      </div>
+
+      <!-- LinkedIn-Style Digital Sports Resume Card -->
+      <div class="resume-card" id="sectionResume">
+        <div class="resume-banner"></div>
+        <div class="resume-header-body">
+          <div class="resume-avatar-wrapper">
+            <div class="resume-avatar" id="resumeAvatarBig">🏏</div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-gold btn-sm" onclick="exportResumePDF()">
+              📥 Export Resume (PDF)
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="UIController.openApplyTrialModal('Under-23 District Selection Trials', 'Hyderabad Warriors CC')">
+              📋 Apply for Trials
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="UIController.openComparisonModal()">
+              ⚖️ Compare Player
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Profile link copied to clipboard!')">
+              🔗 Share Sports Resume
+            </button>
+          </div>
+        </div>
+
+        <div class="resume-main-info">
+          <h1 class="resume-name" id="resFullName">
+            Rahul Kumar
+            <span class="badge badge-rising">🌟 Rising Talent</span>
+          </h1>
+          <div class="resume-headline" id="resHeadline">
+            Cricket • Top-Order / Opening Batsman • Hyderabad, Telangana
+          </div>
+          <div class="resume-location">
+            📍 Gymkhana Grounds, Hyderabad &bull; 🟢 Available for Trials &bull; 2.0 Yrs Experience
+          </div>
+        </div>
+
+        <!-- Resume Tabs Navigation -->
+        <div class="resume-tabs">
+          <button class="resume-tab-btn active" onclick="filterResumeTab('about', this)">About</button>
+          <button class="resume-tab-btn" onclick="filterResumeTab('stats', this)">Performance Stats</button>
+          <button class="resume-tab-btn" onclick="filterResumeTab('tests', this)">Sports Tests</button>
+          <button class="resume-tab-btn" onclick="filterResumeTab('matches', this)">Match Records</button>
+          <button class="resume-tab-btn" onclick="filterResumeTab('certs', this)">Certificates</button>
+          <button class="resume-tab-btn" onclick="filterResumeTab('network', this)">Teammates & Opponents</button>
+        </div>
+
+        <!-- Resume Tab Body -->
+        <div class="resume-tab-content">
+          <!-- 1. About Section -->
+          <div id="tabAbout" class="sub-tab">
+            <h3 style="font-size:18px; margin-bottom:10px;">About Player</h3>
+            <p style="color:var(--text-secondary); line-height:1.7; font-size:14px; margin-bottom:20px;" id="resBio">
+              Passionate top-order batsman with relentless practice ethics. Focus on high conversion rate, explosive gap finding, and disciplined technique against incoming seam deliveries. Verified record across district tournaments and invitational state leagues.
+            </p>
+
+            <h4 style="font-size:15px; margin-bottom:12px;">Sports Information</h4>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; background:rgba(0,0,0,0.2); padding:16px; border-radius:var(--radius-md); font-size:13px;">
+              <div><b>Primary Sport:</b> Cricket</div>
+              <div><b>Primary Role:</b> Batsman</div>
+              <div><b>Preferred Position:</b> Opening / Number 3</div>
+              <div><b>Batting Style:</b> Right-hand top order</div>
+              <div><b>Age Group:</b> Under-23 (DOB: 14 May 2004)</div>
+              <div><b>Trial Availability:</b> <span style="color:var(--primary); font-weight:700;">🟢 Available for Trials</span></div>
+            </div>
+          </div>
+
+          <!-- 2. Sport-Specific Performance Stats -->
+          <div id="tabStats" class="sub-tab" style="display:none;">
+            <h3 style="font-size:18px; margin-bottom:8px;">Sport-Specific Statistics</h3>
+            <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:18px;">
+              *All stats derived exclusively from authorized, official match scorecards. Self-declared data is barred from this section.
+            </p>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:24px;">
+              <div style="background:var(--bg-surface-elevated); padding:14px; border-radius:var(--radius-md); text-align:center;">
+                <strong style="font-size:24px; display:block;">6</strong>
+                <small style="color:var(--text-muted); text-transform:uppercase; font-size:10px;">Verified Matches</small>
+              </div>
+              <div style="background:var(--bg-surface-elevated); padding:14px; border-radius:var(--radius-md); text-align:center;">
+                <strong style="font-size:24px; display:block; color:var(--primary);">312</strong>
+                <small style="color:var(--text-muted); text-transform:uppercase; font-size:10px;">Total Runs</small>
+              </div>
+              <div style="background:var(--bg-surface-elevated); padding:14px; border-radius:var(--radius-md); text-align:center;">
+                <strong style="font-size:24px; display:block;">62.4</strong>
+                <small style="color:var(--text-muted); text-transform:uppercase; font-size:10px;">Batting Average</small>
+              </div>
+              <div style="background:var(--bg-surface-elevated); padding:14px; border-radius:var(--radius-md); text-align:center;">
+                <strong style="font-size:24px; display:block; color:var(--gold);">72*</strong>
+                <small style="color:var(--text-muted); text-transform:uppercase; font-size:10px;">Highest Score</small>
+              </div>
+              <div style="background:var(--bg-surface-elevated); padding:14px; border-radius:var(--radius-md); text-align:center;">
+                <strong style="font-size:24px; display:block; color:var(--cyan);">148.6</strong>
+                <small style="color:var(--text-muted); text-transform:uppercase; font-size:10px;">Strike Rate</small>
+              </div>
+              <div style="background:var(--bg-surface-elevated); padding:14px; border-radius:var(--radius-md); text-align:center;">
+                <strong style="font-size:24px; display:block; color:var(--primary);">9.2</strong>
+                <small style="color:var(--text-muted); text-transform:uppercase; font-size:10px;">Recent Form Rating</small>
+              </div>
+            </div>
+
+            <div style="background:rgba(0, 230, 118, 0.05); border:1px solid rgba(0, 230, 118, 0.2); border-radius:var(--radius-md); padding:16px;">
+              <h4 style="font-size:14px; margin-bottom:6px;">Recent Form Trail (Last 5 Innings)</h4>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <span class="stat-tag" style="background:rgba(0, 230, 118, 0.2); color:var(--primary); font-size:13px;">72 (48b) vs Rising Stars - Final</span>
+                <span class="stat-tag" style="background:rgba(0, 230, 118, 0.2); color:var(--primary); font-size:13px;">54* (39b) vs Challengers - Semi</span>
+                <span class="stat-tag" style="background:rgba(0, 230, 118, 0.2); color:var(--primary); font-size:13px;">68 (44b) vs Strikers</span>
+                <span class="stat-tag" style="background:rgba(0, 230, 118, 0.2); color:var(--primary); font-size:13px;">81 (52b) vs Hyderabad Blues</span>
+                <span class="stat-tag" style="background:rgba(0, 230, 118, 0.2); color:var(--primary); font-size:13px;">37 (26b) vs Secunderabad XI</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Sports Tests & Radar Section -->
+          <div id="tabTests" class="sub-tab" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="font-size:18px;">Certified Sports Skill Assessments</h3>
+                <p style="font-size:13px; color:var(--text-muted);">Conducted by Coach Vikram Rathore (BCCI Level 2 Evaluator)</p>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <select class="form-select" id="batterySelect" style="width:190px; padding:6px 10px;" onchange="switchSkillBattery(this.value)">
+                  <option value="Cricket">🏏 Cricket Battery</option>
+                  <option value="Football">⚽ Football Battery</option>
+                  <option value="Basketball">🏀 Basketball Battery</option>
+                  <option value="Athletics">🏃 Athletics Battery</option>
+                </select>
+                <div class="badge badge-verified" id="overallSkillBadge">Overall Skill: 88/100</div>
+              </div>
+            </div>
+
+            <div class="charts-split">
+              <div class="chart-box">
+                <h4><span>Radar Assessment Polygon</span> <small style="color:var(--text-muted);" id="batterySubtitle">Cricket Battery</small></h4>
+                <canvas id="skillRadarCanvas" width="340" height="300"></canvas>
+              </div>
+
+              <div class="chart-box" style="align-items:stretch;">
+                <h4>Individual Assessment Breakdown</h4>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-top:6px;" id="skillBarList">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:3px;">
+                      <span>Batting Accuracy</span> <b>91/100</b>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                      <div style="width:91%; height:100%; background:var(--primary);"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:3px;">
+                      <span>Reaction Time (135km/h delivery)</span> <b>94/100</b>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                      <div style="width:94%; height:100%; background:var(--cyan);"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:3px;">
+                      <span>Running Between Wickets</span> <b>88/100</b>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                      <div style="width:88%; height:100%; background:var(--primary);"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:3px;">
+                      <span>Fitness & Endurance (Beep Test)</span> <b>86/100</b>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                      <div style="width:86%; height:100%; background:var(--gold);"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:3px;">
+                      <span>Fielding Agility</span> <b>82/100</b>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                      <div style="width:82%; height:100%; background:var(--primary);"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Strengths & Development Areas -->
+                <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-subtle); display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:12px;">
+                  <div style="background:rgba(0, 230, 118, 0.08); padding:10px; border-radius:var(--radius-sm);">
+                    <b style="color:var(--primary);">💪 Strengths:</b>
+                    <ul style="margin-top:4px; padding-left:14px; line-height:1.4;">
+                      <li>Exceptional reaction against pace</li>
+                      <li>High conversion in powerplays</li>
+                    </ul>
+                  </div>
+                  <div style="background:rgba(255, 184, 0, 0.08); padding:10px; border-radius:var(--radius-sm);">
+                    <b style="color:var(--gold);">🎯 Development Areas:</b>
+                    <ul style="margin-top:4px; padding-left:14px; line-height:1.4;">
+                      <li>Ground fielding reflex angles</li>
+                      <li>Secondary bowling accuracy</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Verified Match Records & "Played With" / "Played Against" -->
+          <div id="tabMatches" class="sub-tab" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <h3 style="font-size:18px;">Official Verified Match Records</h3>
+              <span class="badge badge-verified">Official Roster Source</span>
+            </div>
+
+            <!-- Match Card 1 -->
+            <div class="match-card">
+              <div class="match-header">
+                <div>
+                  <div class="match-title">Hyderabad District T20 Championship — Grand Final</div>
+                  <div style="font-size:12px; color:var(--text-secondary);">28 August 2026 &bull; 📍 Gymkhana Grounds, Hyderabad</div>
+                </div>
+                <div class="badge badge-verified">🟢 Verified Match Record</div>
+              </div>
+
+              <div class="match-score-summary">
+                <div><b>Warriors XI</b>: 182/4 (20.0 ov)</div>
+                <div style="color:var(--text-muted);">vs</div>
+                <div><b>Rising Stars XI</b>: 164/8 (20.0 ov)</div>
+                <div style="margin-left:auto; color:var(--primary); font-weight:700; font-size:13px;">Warriors XI won by 18 runs</div>
+              </div>
+
+              <div class="player-match-performance">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <b>Rahul Kumar — Opening Batsman</b>
+                  <span style="font-size:12px; color:var(--primary); font-weight:700;">Performance: 9.2/10</span>
+                </div>
+                <div class="player-stat-pills">
+                  <span class="stat-tag">Runs: 72</span>
+                  <span class="stat-tag">Balls: 48</span>
+                  <span class="stat-tag">4s: 8</span>
+                  <span class="stat-tag">6s: 3</span>
+                  <span class="stat-tag">Strike Rate: 150.0</span>
+                </div>
+              </div>
+
+              <!-- Teammates (Played With) -->
+              <div class="roster-cluster">
+                <div class="roster-label">👥 Team Members (Played With) — Clickable Profiles</div>
+                <div class="roster-chips">
+                  <button class="player-chip" onclick="SessionManager.switchDemoUser('player2')">
+                    🏏 Arjun Reddy (All-rounder — 48 Runs, 2 Wkts) ➔
+                  </button>
+                  <span class="player-chip">🏏 Pranav Varma (Wicketkeeper — 24 Runs, 2 Catches)</span>
+                  <span class="player-chip">🏏 Suresh Mani (Bowler — 2 Wickets)</span>
+                </div>
+              </div>
+
+              <!-- Opponents (Played Against) -->
+              <div class="roster-cluster" style="margin-top:8px;">
+                <div class="roster-label">⚔️ Played Against — Clickable Profiles</div>
+                <div class="roster-chips">
+                  <button class="player-chip" onclick="SessionManager.switchDemoUser('player3')">
+                    🏏 Kiran Kumar (Bowler — 3 Wickets, 31 Runs) ➔
+                  </button>
+                  <span class="player-chip">🏏 Tarun Sen (Captain / Batsman — 52 Runs)</span>
+                </div>
+              </div>
+
+              <div style="font-size:11px; color:var(--text-muted); margin-top:12px; text-align:right;">
+                Verified by: <b>Telangana Youth Sports Council (Authorized Tournament Organizer)</b>
+              </div>
+            </div>
+
+            <!-- Match Card 2 -->
+            <div class="match-card">
+              <div class="match-header">
+                <div>
+                  <div class="match-title">Hyderabad District T20 Championship — Semi-Final</div>
+                  <div style="font-size:12px; color:var(--text-secondary);">26 August 2026 &bull; 📍 Gymkhana Grounds, Hyderabad</div>
+                </div>
+                <div class="badge badge-verified">🟢 Verified Match Record</div>
+              </div>
+
+              <div class="match-score-summary">
+                <div><b>Warriors XI</b>: 158/5 (18.4 ov)</div>
+                <div style="color:var(--text-muted);">vs</div>
+                <div><b>Deccan Challengers</b>: 155/7 (20.0 ov)</div>
+                <div style="margin-left:auto; color:var(--primary); font-weight:700; font-size:13px;">Warriors XI won by 5 wickets</div>
+              </div>
+
+              <div class="player-match-performance">
+                <b>Rahul Kumar:</b> 54* Runs (39 balls, 6 fours, 1 six, Not Out)
+              </div>
+              <div style="font-size:11px; color:var(--text-muted); text-align:right;">
+                Verified by: <b>Telangana Youth Sports Council (Authorized Tournament Organizer)</b>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Certificates & Achievements -->
+          <div id="tabCerts" class="sub-tab" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="font-size:18px;">Certificates & Verified Achievements</h3>
+                <p style="font-size:13px; color:var(--text-muted);">
+                  Submissions enter the Admin Verification Queue. Only 🟢 Verified certificates count toward platform classification.
+                </p>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openCertificateUploadModal()">+ Submit Certificate</button>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:14px;" id="certsListContainer">
+              <!-- Cert 1: Verified -->
+              <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <h4 style="font-size:16px;">District Under-19 Championship Trophy — Best Batsman</h4>
+                    <span class="badge badge-verified">🟢 Verified Certificate</span>
+                  </div>
+                  <div style="font-size:13px; color:var(--cyan); margin-top:2px;">Issuing Org: Telangana Cricket Association & TYSC (2025)</div>
+                  <p style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                    Awarded Best Batsman across 6 tournament matches with 340 tournament runs and highest strike rate.
+                  </p>
+                  <small style="font-size:11px; color:var(--text-muted);">Verified by: Chief Sports Verifier (Admin) on 01 Aug 2026</small>
+                </div>
+                <div>
+                  <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Opening verified certificate document viewer...')">
+                    👁️ View Certificate
+                  </button>
+                </div>
+              </div>
+
+              <!-- Cert 2: Pending -->
+              <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <h4 style="font-size:16px;">State Youth Championship Participation Certificate</h4>
+                    <span class="badge badge-pending">🟡 Pending Verification</span>
+                  </div>
+                  <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">Issuing Org: South Zone Sports Federation (2026)</div>
+                  <p style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                    Semi-Finalist representing Hyderabad Central District.
+                  </p>
+                  <small style="font-size:11px; color:var(--text-muted);">Status: Queued for Admin audit against regional sports registry</small>
+                </div>
+                <div>
+                  <span class="badge badge-pending">In Admin Queue</span>
+                </div>
+              </div>
+
+              <!-- Cert 3: Rejected Demo -->
+              <div style="background:var(--bg-surface-elevated); border:1px solid rgba(255,51,102,0.25); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <h4 style="font-size:16px;">Private Weekend Club Tournament Winner</h4>
+                    <span class="badge badge-rejected">❌ Rejected</span>
+                  </div>
+                  <div style="font-size:13px; color:var(--rose); margin-top:2px;">Local Weekend Club (2024)</div>
+                  <p style="font-size:12.5px; color:var(--rose); margin-top:4px;">
+                    Reason: Missing official seal and registration numbers from sanctioned sports board.
+                  </p>
+                </div>
+                <div>
+                  <span class="badge badge-rejected">Not Approved</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Teammates & Opponents Network View -->
+          <div id="tabNetwork" class="sub-tab" style="display:none;">
+            <h3 style="font-size:18px; margin-bottom:8px;">Sports Network: Played With & Played Against</h3>
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:18px;">
+              SportsConnect builds genuine connections based on real match scorecards.
+            </p>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+              <div style="background:var(--bg-surface-elevated); padding:18px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+                <div style="font-size:28px; margin-bottom:6px;">🏏</div>
+                <h4 style="font-size:16px;">Arjun Reddy <span class="badge badge-emerging">Emerging</span></h4>
+                <p style="font-size:12.5px; color:var(--text-secondary); margin:4px 0 10px;">
+                  Teammate at Warriors XI &bull; All-rounder &bull; 48 runs, 2 wickets in T20 Final.
+                </p>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-primary btn-sm" onclick="SessionManager.switchDemoUser('player2')">View Resume</button>
+                  <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Message sent to Arjun!')">Message</button>
+                </div>
+              </div>
+
+              <div style="background:var(--bg-surface-elevated); padding:18px; border-radius:var(--radius-lg); border:1px solid var(--border-subtle);">
+                <div style="font-size:28px; margin-bottom:6px;">🏏</div>
+                <h4 style="font-size:16px;">Kiran Kumar <span class="badge badge-rising">Rising Talent</span></h4>
+                <p style="font-size:12.5px; color:var(--text-secondary); margin:4px 0 10px;">
+                  Opponent at Rising Stars XI &bull; Bowler &bull; 3 wickets in T20 Final.
+                </p>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-primary btn-sm" onclick="SessionManager.switchDemoUser('player3')">View Resume</button>
+                  <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Connection request sent to Kiran!')">Connect</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Line Chart & Improvement Section -->
+      <div class="resume-card" style="padding:28px;" id="sectionProgress">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="font-size:18px; display:flex; align-items:center; gap:8px;">
+              📈 6-Month Performance Improvement Timeline
+              <span class="badge badge-verified progress-up">+21% Improvement</span>
+            </h3>
+            <p style="font-size:13px; color:var(--text-secondary);">
+              Monthly composite rating tracking (January: 68 → September: 88).
+            </p>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted);">
+            Scored via Scientific Skills Engine
+          </div>
+        </div>
+
+        <div style="background:rgba(0, 0, 0, 0.2); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:20px; display:flex; justify-content:center;">
+          <canvas id="progressCanvas" width="680" height="240"></canvas>
+        </div>
+      </div>
+
+      <!-- Trials & Opportunities Interactive Section -->
+      <div class="resume-card" style="padding:28px;" id="sectionTrials">
+        <h3 style="font-size:18px; margin-bottom:8px;">🏏 Active Trial Invitations</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:18px;">
+          Direct invitations sent to you by verified clubs and scouts.
+        </p>
+
+        <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-medium); border-radius:var(--radius-lg); padding:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <span class="badge badge-verified" style="margin-bottom:6px;">Club Invitation</span>
+              <h4 style="font-size:17px;">Under-23 State League Selection Trials</h4>
+              <div style="font-size:13px; color:var(--cyan); margin-top:2px;">Hosted by: Hyderabad Warriors CC (Division 1)</div>
+              <div style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">
+                Looking for: <b>Top-Order Opening Batsman</b> &bull; Date: <b>20 September 2026, 09:00 AM</b>
+              </div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+                📍 Rajiv Gandhi International Stadium Annex Ground, Hyderabad
+              </div>
+            </div>
+            <div style="display:flex; gap:10px;" id="trialActionButtons">
+              <button class="btn btn-outline btn-sm" onclick="respondTrial('declined')">Decline</button>
+              <button class="btn btn-primary btn-sm" onclick="respondTrial('accepted')">Accept Trial ➔</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Privacy Settings Section -->
+      <div class="resume-card" style="padding:28px;" id="sectionPrivacy">
+        <h3 style="font-size:18px; margin-bottom:8px;">🛡️ Privacy & Visibility Controls</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:18px;">
+          You control who sees your verified data, contact details, and match records.
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:600px;">
+          <label style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:12px 16px; border-radius:var(--radius-md);">
+            <span>Public Profile Visibility</span>
+            <input type="checkbox" checked style="accent-color:var(--primary);">
+          </label>
+          <label style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:12px 16px; border-radius:var(--radius-md);">
+            <span>Contact Information (Phone/Email)</span>
+            <select class="form-select" style="width:180px; padding:6px 10px;">
+              <option selected>Connections Only</option>
+              <option>Verified Clubs/Coaches</option>
+              <option>Private</option>
+            </select>
+          </label>
+          <label style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:12px 16px; border-radius:var(--radius-md);">
+            <span>Show Official Match Statistics</span>
+            <input type="checkbox" checked style="accent-color:var(--primary);">
+          </label>
+          <button class="btn btn-primary btn-sm" style="width:fit-content; margin-top:8px;" onclick="UIController.showToast('Privacy preferences updated.')">
+            Save Privacy Settings
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Certificate Upload Modal -->
+  <div class="modal-overlay" id="certModal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>📜 Submit Certificate for Verification</h3>
+        <button class="modal-close" onclick="UIController.closeModal('certModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:14px;">
+          Uploaded certificates enter the Admin Verification Queue. Please ensure issuing board registration number is clearly legible.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Certificate Title / Honor</label>
+          <input id="upCertTitle" class="form-input" placeholder="e.g. State Youth Cup Winner - Best Batsman">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Issuing Organization / Sports Board</label>
+          <input id="upCertOrg" class="form-input" placeholder="e.g. Telangana Cricket Association">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Year</label>
+            <input id="upCertYear" type="number" class="form-input" value="2026">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Achievement Category</label>
+            <select id="upCertCategory" class="form-select">
+              <option>Tournament Winner / Trophy</option>
+              <option>Best Player / Batsman Award</option>
+              <option>Participation & Certification</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Certificate Document File (PDF / Image)</label>
+          <input type="file" class="form-input" style="padding:7px 10px;">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-outline" onclick="UIController.closeModal('certModal')">Cancel</button>
+          <button class="btn btn-primary" onclick="submitNewCertificate()">Submit for Verification ➔</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>
+    function showResumeTab(tabName) {
+      const sections = ['sectionResume', 'sectionProgress', 'sectionTrials', 'sectionPrivacy'];
+      document.querySelectorAll('.side-item').forEach(b => b.classList.remove('active'));
+
+      if (tabName === 'tests') {
+        filterResumeTab('tests', document.querySelectorAll('.resume-tab-btn')[2]);
+        document.getElementById('sectionResume').scrollIntoView({ behavior: 'smooth' });
+      } else if (tabName === 'matches') {
+        filterResumeTab('matches', document.querySelectorAll('.resume-tab-btn')[3]);
+        document.getElementById('sectionResume').scrollIntoView({ behavior: 'smooth' });
+      } else if (tabName === 'certificates') {
+        filterResumeTab('certs', document.querySelectorAll('.resume-tab-btn')[4]);
+        document.getElementById('sectionResume').scrollIntoView({ behavior: 'smooth' });
+      } else if (tabName === 'progress') {
+        document.getElementById('sectionProgress').scrollIntoView({ behavior: 'smooth' });
+      } else if (tabName === 'trials') {
+        document.getElementById('sectionTrials').scrollIntoView({ behavior: 'smooth' });
+      } else if (tabName === 'privacy') {
+        document.getElementById('sectionPrivacy').scrollIntoView({ behavior: 'smooth' });
+      } else if (tabName === 'messages') {
+        UIController.showToast('Opening active scout message thread with Coach Vikram Rathore...');
+        setTimeout(() => SessionManager.switchDemoUser('coach'), 700);
+      } else {
+        filterResumeTab('about', document.querySelectorAll('.resume-tab-btn')[0]);
+        document.getElementById('sectionResume').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function filterResumeTab(tabKey, btn) {
+      document.querySelectorAll('.resume-tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const tabs = {
+        about: 'tabAbout',
+        stats: 'tabStats',
+        tests: 'tabTests',
+        matches: 'tabMatches',
+        certs: 'tabCerts',
+        network: 'tabNetwork'
+      };
+
+      Object.values(tabs).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+
+      const activeId = tabs[tabKey];
+      if (activeId) {
+        document.getElementById(activeId).style.display = 'block';
+        if (tabKey === 'tests') {
+          setTimeout(() => ChartRenderer.drawRadar('skillRadarCanvas', DEMO_TESTS[1]), 50);
+        }
+      }
+    }
+
+    function openCertificateUploadModal() {
+      UIController.openModal('certModal');
+    }
+
+    async function submitNewCertificate() {
+      const title = document.getElementById('upCertTitle').value.trim();
+      const org = document.getElementById('upCertOrg').value.trim();
+      const year = document.getElementById('upCertYear').value;
+
+      if (!title || !org) {
+        alert('Please fill in title and issuing organization.');
+        return;
+      }
+
+      await DataService.submitReport; // or certificate
+      UIController.closeModal('certModal');
+      UIController.showToast(`Certificate "${title}" submitted. Status: 🟡 Pending Verification in Admin Queue.`, 'success');
+
+      // Add to list
+      const container = document.getElementById('certsListContainer');
+      const newCard = document.createElement('div');
+      newCard.style = "background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;";
+      newCard.innerHTML = `
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h4 style="font-size:16px;">${title}</h4>
+            <span class="badge badge-pending">🟡 Pending Verification</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">Issuing Org: ${org} (${year})</div>
+          <p style="font-size:12.5px; color:var(--text-secondary); margin-top:4px;">Pending review by platform integrity team.</p>
+        </div>
+        <div><span class="badge badge-pending">In Queue</span></div>
+      `;
+      container.prepend(newCard);
+    }
+
+    function respondTrial(status) {
+      const container = document.getElementById('trialActionButtons');
+      if (status === 'accepted') {
+        container.innerHTML = `<span class="badge badge-verified" style="font-size:13px; padding:6px 14px;">✓ Trial Invitation Accepted!</span>`;
+        UIController.showToast('You accepted the trial invitation with Hyderabad Warriors CC!');
+      } else {
+        container.innerHTML = `<span class="badge badge-rejected" style="font-size:13px; padding:6px 14px;">Trial Declined</span>`;
+        UIController.showToast('Trial declined.');
+      }
+    }
+
+    function exportResumePDF() {
+      UIController.showToast('Generating printable verified sports resume...');
+      setTimeout(() => window.print(), 400);
+    }
+
+    const BATTERY_DATA = {
+      Cricket: [
+        { name: 'Batting Accuracy', score: 91 },
+        { name: 'Reaction Time', score: 94 },
+        { name: 'Running', score: 88 },
+        { name: 'Fitness', score: 86 },
+        { name: 'Fielding', score: 82 },
+        { name: 'Bowling', score: 62 }
+      ],
+      Football: [
+        { name: 'Dribbling', score: 88 },
+        { name: 'Pace', score: 92 },
+        { name: 'Passing', score: 86 },
+        { name: 'Shooting', score: 89 },
+        { name: 'Defense', score: 74 },
+        { name: 'Stamina', score: 90 }
+      ],
+      Basketball: [
+        { name: 'Shooting', score: 85 },
+        { name: 'Ball Handling', score: 89 },
+        { name: 'Athleticism', score: 91 },
+        { name: 'Defense', score: 84 },
+        { name: 'Passing', score: 87 },
+        { name: 'Rebounding', score: 80 }
+      ],
+      Badminton: [
+        { name: 'Smash Velocity', score: 91 },
+        { name: 'Footwork Agility', score: 95 },
+        { name: 'Net Deception', score: 89 },
+        { name: 'Reaction Speed', score: 94 },
+        { name: 'Endurance Base', score: 88 },
+        { name: 'Serve Precision', score: 87 }
+      ],
+      Athletics: [
+        { name: '100m Sprint', score: 94 },
+        { name: 'VO2 Max', score: 90 },
+        { name: 'Power', score: 92 },
+        { name: 'Agility', score: 88 },
+        { name: 'Recovery', score: 86 },
+        { name: 'Flexibility', score: 82 }
+      ]
+    };
+
+    function switchSkillBattery(sport) {
+      const tests = BATTERY_DATA[sport] || BATTERY_DATA.Cricket;
+      const avg = Math.round(tests.reduce((s, t) => s + t.score, 0) / tests.length);
+      const badge = document.getElementById('overallSkillBadge');
+      if (badge) badge.textContent = `Overall Skill: ${avg}/100`;
+      const subtitle = document.getElementById('batterySubtitle');
+      if (subtitle) subtitle.textContent = `${sport} Battery`;
+      ChartRenderer.drawRadar('skillRadarCanvas', tests);
+      UIController.showToast(`Switched to certified ${sport} Skill Assessment Battery (${avg}/100)!`);
+    }
+
+    async function loadAthleteProfile(pId) {
+      const pidNum = parseInt(pId) || 1;
+      let current = (typeof SessionManager !== 'undefined') ? SessionManager.getUser() : null;
+
+      // Always refresh the authenticated profile from SQLite when a real user id
+      // exists. This prevents the dashboard from displaying the demo Rahul profile.
+      if (current && current.id && current.role === 'Player' && typeof DataService !== 'undefined') {
+        try {
+          const fresh = await DataService.getMe(current.id);
+          if (fresh && fresh.user) {
+            current = { ...current, ...fresh.user, ...(fresh.user.player_profile || {}) };
+            SessionManager.setUser(current);
+          }
+        } catch (e) { console.warn('Could not refresh player profile:', e); }
+      }
+
+      // Prefer the authenticated user's real registration data. Demo data is used
+      // only when this page is intentionally opened without an authenticated session.
+      const user = current && current.role === 'Player' ? {
+        ...current,
+        full_name: current.full_name || current.username || 'Player',
+        username: current.username || '',
+        avatar: current.avatar || (current.sport === 'Cricket' ? '🏏' : current.sport === 'Football' ? '⚽' : '🏃'),
+        location: current.location || [current.city, current.district, current.state].filter(Boolean).join(', '),
+        bio: current.bio || 'SportsConnect player profile.',
+        classification: current.classification || 'Player',
+        rating: Number(current.rating || 0), skill_score: Number(current.skill_score || 0),
+        progress_pct: Number(current.progress_pct || 0), major_matches: Number(current.major_matches || 0),
+        verified_local_matches: Number(current.verified_local_matches || 0),
+        sport: current.sport || 'Multi-Sport', position: current.position || 'Player',
+        availability: current.availability || 'Not specified'
+      } : (DEMO_USERS['player' + pidNum] || DEMO_USERS.player1);
+
+      // Update Header & Resume
+      const nameTitle = document.getElementById('playerNameTitle');
+      if (nameTitle) nameTitle.textContent = user.full_name;
+      const subTitle = document.getElementById('playerSubtitle');
+      if (subTitle) subTitle.textContent = `${user.sport} | ${user.position} | ${user.location}`;
+      const avatarIcon = document.getElementById('playerAvatarIcon');
+      if (avatarIcon) avatarIcon.textContent = user.avatar;
+      
+      const resName = document.getElementById('resFullName');
+      if (resName) resName.innerHTML = `${user.full_name} <span class="badge badge-rising">🌟 ${user.classification}</span>`;
+      const resHead = document.getElementById('resHeadline');
+      if (resHead) resHead.textContent = `${user.sport} • ${user.position} • ${user.location}`;
+      const resAvatar = document.getElementById('resumeAvatarBig');
+      if (resAvatar) resAvatar.textContent = user.avatar;
+
+      const kpiCls = document.getElementById('kpiClassification');
+      if (kpiCls) kpiCls.textContent = user.classification;
+      const kpiRat = document.getElementById('kpiRating');
+      if (kpiRat) kpiRat.innerHTML = `${user.rating}<small style="font-size:14px; color:var(--text-muted);">/10</small>`;
+      const kpiSk = document.getElementById('kpiSkill');
+      if (kpiSk) kpiSk.innerHTML = `${Math.round(user.skill_score)}<small style="font-size:14px;">/100</small>`;
+      const kpiProg = document.getElementById('kpiProgress');
+      if (kpiProg) kpiProg.textContent = `+${Math.round(user.progress_pct)}%`;
+      
+      const bioEl = document.getElementById('resBio');
+      if (bioEl) bioEl.textContent = user.bio;
+
+      // Draw dynamic radar
+      const tests = DEMO_TESTS[pidNum] || DEMO_TESTS[1];
+      ChartRenderer.drawRadar('skillRadarCanvas', tests);
+      
+      // Update progress chart
+      const progressVals = pidNum === 4 ? [66, 70, 74, 80, 85, 89] : (pidNum === 5 ? [65, 71, 78, 83, 87, 91] : [68, 72, 75, 79, 84, 88]);
+      ChartRenderer.drawLineProgress('progressCanvas', progressVals);
+
+      const sel = document.getElementById('athleteSwitcher');
+      if (sel) sel.value = pidNum;
+
+      UIController.showToast(`Loaded verified resume for ${user.full_name} (${user.sport})!`);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const playerParam = urlParams.get('player') || urlParams.get('id') || 'current';
+      loadAthleteProfile(playerParam);
+    });
+  </script>
+</body>
+</html>

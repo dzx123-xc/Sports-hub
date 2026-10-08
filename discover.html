@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SportsConnect | Talent Discovery & Sports Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="page-bg"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <a class="brand" href="index.html">
+      <div class="brand-icon">🏆</div>
+      <div>
+        <div class="brand-name">SPORTS<span>CONNECT</span></div>
+        <div class="brand-tagline">TALENT DISCOVERY</div>
+      </div>
+    </a>
+
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="discover.html?tab=players" class="active">Players</a>
+      <a href="discover.html?tab=rising" class="highlight">🌟 Rising Talent</a>
+      <a href="discover.html?tab=coaches">Coaches</a>
+      <a href="discover.html?tab=clubs">Clubs</a>
+      <a href="discover.html?tab=tournaments">Tournaments</a>
+    </nav>
+
+    <div class="nav-actions">
+      <button class="btn btn-outline btn-sm" onclick="UIController.toggleTheme()">🌓 Mode</button>
+      <button class="btn btn-outline" onclick="SessionManager.switchDemoUser('coach')">Coach Console</button>
+      <button class="btn btn-primary" onclick="SessionManager.switchDemoUser('player1')">My Sports Resume</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="section" style="padding-top: 40px;">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">SPORTS NETWORK DIRECTORY</div>
+        <h1 class="section-title">Discover Verified Sports Talent</h1>
+        <p class="section-subtitle">
+          Explore athletes, accredited coaches, registered clubs, and sanctioned tournament fixtures.
+        </p>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-gold btn-sm" onclick="UIController.openComparisonModal(DEMO_USERS.player1, DEMO_USERS.player2)">
+          ⚖️ Compare Rahul vs Arjun
+        </button>
+      </div>
+    </div>
+
+    <!-- Directory Search Tabs -->
+    <div class="resume-tabs" style="margin-bottom: 24px; padding: 0;">
+      <button class="resume-tab-btn active" id="tabBtnPlayers" onclick="switchDirectoryTab('players')">
+        🏃 Players & Rising Talent
+      </button>
+      <button class="resume-tab-btn" id="tabBtnCoaches" onclick="switchDirectoryTab('coaches')">
+        🧑‍🏫 Coaches
+      </button>
+      <button class="resume-tab-btn" id="tabBtnClubs" onclick="switchDirectoryTab('clubs')">
+        🏢 Clubs
+      </button>
+      <button class="resume-tab-btn" id="tabBtnTournaments" onclick="switchDirectoryTab('tournaments')">
+        🏆 Tournaments
+      </button>
+    </div>
+
+    <!-- Players Search Panel -->
+    <div id="dirPlayersSec">
+      <div class="resume-card" style="padding: 22px; margin-bottom: 24px;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px;">
+          <div>
+            <label class="form-label">Sport</label>
+            <select id="dSport" class="form-select" onchange="filterDirectoryPlayers()">
+              <option value="All">All Sports</option>
+              <option value="Cricket" selected>Cricket</option>
+              <option value="Football">Football</option>
+              <option value="Badminton">Badminton</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Role / Position</label>
+            <select id="dPosition" class="form-select" onchange="filterDirectoryPlayers()">
+              <option value="All">All Roles</option>
+              <option value="Batsman">Batsman</option>
+              <option value="Bowler">Bowler</option>
+              <option value="All-rounder">All-rounder</option>
+              <option value="Forward">Forward (Football)</option>
+              <option value="Singles">Singles (Badminton)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Classification</label>
+            <select id="dClassification" class="form-select" onchange="filterDirectoryPlayers()">
+              <option value="All">All Classifications</option>
+              <option value="Rising Talent" selected>🌟 Rising Talent</option>
+              <option value="Emerging Player">📈 Emerging Player</option>
+              <option value="Established Player">⭐ Established Player</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Min Skill Score</label>
+            <select id="dMinSkill" class="form-select" onchange="filterDirectoryPlayers()">
+              <option value="0">Any Score</option>
+              <option value="80" selected>80+ (High Skill)</option>
+              <option value="85">85+ (Elite Potential)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Availability</label>
+            <select id="dAvailability" class="form-select" onchange="filterDirectoryPlayers()">
+              <option value="All">Any Status</option>
+              <option value="Available for Trials" selected>Available for Trials</option>
+              <option value="In Club">In Club</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Player Cards Stream -->
+      <div class="talent-grid" id="directoryPlayerGrid">
+        <!-- Rahul Kumar -->
+        <div class="talent-card" data-sport="Cricket" data-position="Batsman" data-class="Rising Talent" data-skill="88">
+          <div class="talent-header">
+            <div class="talent-avatar">🏏</div>
+            <div class="talent-meta">
+              <h4>Rahul Kumar <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Cricket &bull; Opening Batsman &bull; Hyderabad</div>
+              <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+            </div>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+            Top-order batsman with 94 reaction time. 72 runs in District T20 Final. 0 major matches, 6 verified local matches.
+          </p>
+          <div class="talent-metrics-row">
+            <div class="metric-box"><strong>88/100</strong><small>Skill Score</small></div>
+            <div class="metric-box"><strong>86/100</strong><small>Match Perf</small></div>
+            <div class="metric-box"><strong class="progress-up">+21%</strong><small>Progress</small></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+            <span>Major Matches: <b>0</b></span>
+            <span style="color:var(--primary);">🟢 Available for Trials</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player1')">
+              Sports Resume
+            </button>
+            <button class="btn btn-gold btn-sm" onclick="testSmartMatchRahul()">
+              🎯 94% Match
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Trial invitation dispatched to Rahul Kumar!')">
+              Invite 🏏
+            </button>
+          </div>
+        </div>
+
+        <!-- Kiran Kumar -->
+        <div class="talent-card" data-sport="Cricket" data-position="Bowler" data-class="Rising Talent" data-skill="87">
+          <div class="talent-header">
+            <div class="talent-avatar">🏏</div>
+            <div class="talent-meta">
+              <h4>Kiran Kumar <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Cricket &bull; Fast Bowler &bull; Secunderabad</div>
+              <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+            </div>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+            Right-arm fast bowler with late outswing and yorkers at death overs. 3 wickets in District Final.
+          </p>
+          <div class="talent-metrics-row">
+            <div class="metric-box"><strong>87/100</strong><small>Skill Score</small></div>
+            <div class="metric-box"><strong>85/100</strong><small>Match Perf</small></div>
+            <div class="metric-box"><strong class="progress-up">+19%</strong><small>Progress</small></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+            <span>Major Matches: <b>0</b></span>
+            <span style="color:var(--primary);">🟢 Available for Trials</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player3')">
+              Sports Resume
+            </button>
+            <button class="btn btn-gold btn-sm" onclick="testSmartMatchKiran()">
+              🎯 87% Match
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Trial invitation dispatched to Kiran Kumar!')">
+              Invite 🏏
+            </button>
+          </div>
+        </div>
+
+        <!-- Arjun Reddy -->
+        <div class="talent-card" data-sport="Cricket" data-position="All-rounder" data-class="Emerging Player" data-skill="84">
+          <div class="talent-header">
+            <div class="talent-avatar">🏏</div>
+            <div class="talent-meta">
+              <h4>Arjun Reddy <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Cricket &bull; All-rounder &bull; Hyderabad</div>
+              <div class="badge badge-emerging" style="margin-top:4px;">📈 Emerging Player</div>
+            </div>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+            Seam-bowling all-rounder with strong middle-order conversion. 48 runs, 2 wickets in T20 Final.
+          </p>
+          <div class="talent-metrics-row">
+            <div class="metric-box"><strong>84/100</strong><small>Skill Score</small></div>
+            <div class="metric-box"><strong>81/100</strong><small>Match Perf</small></div>
+            <div class="metric-box"><strong class="progress-up">+15%</strong><small>Progress</small></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+            <span>Major Matches: <b>4</b></span>
+            <span style="color:var(--cyan);">In Club (Warriors)</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="SessionManager.switchDemoUser('player2')">
+              Sports Resume
+            </button>
+            <button class="btn btn-gold btn-sm" onclick="testSmartMatchArjun()">
+              🎯 91% Match
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Message sent to Arjun Reddy!')">
+              Connect 🤝
+            </button>
+          </div>
+        </div>
+
+        <!-- Sunil Varma -->
+        <div class="talent-card" data-sport="Football" data-position="Forward" data-class="Rising Talent" data-skill="89">
+          <div class="talent-header">
+            <div class="talent-avatar">⚽</div>
+            <div class="talent-meta">
+              <h4>Sunil Varma <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Football &bull; Center Forward &bull; Bengaluru</div>
+              <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+            </div>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+            Clinical striker with high conversion in tight boxes and +24% progress rate in youth leagues.
+          </p>
+          <div class="talent-metrics-row">
+            <div class="metric-box"><strong>89/100</strong><small>Skill Score</small></div>
+            <div class="metric-box"><strong>87/100</strong><small>Match Perf</small></div>
+            <div class="metric-box"><strong class="progress-up">+24%</strong><small>Progress</small></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+            <span>Major Matches: <b>0</b></span>
+            <span style="color:var(--primary);">🟢 Available</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="UIController.showToast('Viewing Sunil Varma football resume...')">
+              Sports Resume
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Trial invite created for Sunil Varma!')">
+              Invite ⚽
+            </button>
+          </div>
+        </div>
+
+        <!-- Ananya Sharma -->
+        <div class="talent-card" data-sport="Badminton" data-position="Singles" data-class="Rising Talent" data-skill="88">
+          <div class="talent-header">
+            <div class="talent-avatar">🏸</div>
+            <div class="talent-meta">
+              <h4>Ananya Sharma <span class="badge badge-verified">● Verified</span></h4>
+              <div class="talent-subtitle">Badminton &bull; Singles &bull; Hyderabad</div>
+              <div class="badge badge-rising" style="margin-top:4px;">🌟 Rising Talent</div>
+            </div>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); line-height:1.4;">
+            Aggressive singles shuttler with 320 km/h overhead smash and rapid net recovery footwork.
+          </p>
+          <div class="talent-metrics-row">
+            <div class="metric-box"><strong>88/100</strong><small>Skill Score</small></div>
+            <div class="metric-box"><strong>86/100</strong><small>Match Perf</small></div>
+            <div class="metric-box"><strong class="progress-up">+22%</strong><small>Progress</small></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted);">
+            <span>Major Matches: <b>1</b></span>
+            <span style="color:var(--primary);">🟢 Available</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="btn btn-outline btn-sm" style="flex:1;" onclick="UIController.showToast('Viewing Ananya Sharma badminton resume...')">
+              Sports Resume
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="UIController.showToast('Invitation sent to Ananya Sharma!')">
+              Invite 🏸
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coaches Panel -->
+    <div id="dirCoachesSec" style="display:none;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+        <div class="resume-card" style="padding:24px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+            <div style="font-size:36px;">🧑‍🏫</div>
+            <div>
+              <h3 style="font-size:18px;">Coach Vikram Rathore <span class="badge badge-verified">🟢 Verified Coach</span></h3>
+              <div style="font-size:13px; color:var(--cyan);">Cricket &bull; BCCI Level 2 Certified Coach</div>
+            </div>
+          </div>
+          <p style="font-size:13.5px; color:var(--text-secondary); line-height:1.5; margin-bottom:14px;">
+            Head Scout for Deccan Regional Academy with 12+ years developing state athletes. Specializes in batting mechanics, mental resilience, and science-backed skill assessments.
+          </p>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-primary btn-sm" onclick="SessionManager.switchDemoUser('coach')">
+              Open Coach Console
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Connecting with Coach Vikram...')">
+              Connect 🤝
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clubs Panel -->
+    <div id="dirClubsSec" style="display:none;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+        <div class="resume-card" style="padding:24px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+            <div style="font-size:36px;">🛡️</div>
+            <div>
+              <h3 style="font-size:18px;">Hyderabad Warriors CC <span class="badge badge-verified">🟢 Verified Club</span></h3>
+              <div style="font-size:13px; color:var(--cyan);">Cricket &bull; Division 1 State League &bull; Est. 2012</div>
+            </div>
+          </div>
+          <p style="font-size:13.5px; color:var(--text-secondary); line-height:1.5; margin-bottom:14px;">
+            Home Ground: Rajiv Gandhi International Stadium Annex. Active recruitment program for Under-23 batsmen and all-rounders.
+          </p>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-primary btn-sm" onclick="SessionManager.switchDemoUser('club')">
+              Open Club Hub
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Trial application submitted to Warriors CC!')">
+              Apply for Trials 🏏
+            </button>
+          </div>
+        </div>
+
+        <div class="resume-card" style="padding:24px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+            <div style="font-size:36px;">⚽</div>
+            <div>
+              <h3 style="font-size:18px;">Deccan Gladiators FC <span class="badge badge-verified">🟢 Verified Club</span></h3>
+              <div style="font-size:13px; color:var(--cyan);">Football &bull; Telangana State Premier Division</div>
+            </div>
+          </div>
+          <p style="font-size:13.5px; color:var(--text-secondary); line-height:1.5; margin-bottom:14px;">
+            Gachibowli Stadium Turf. High-intensity youth conditioning and state championship scouting.
+          </p>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Contacting Deccan Gladiators FC...')">
+              Connect ⚽
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tournaments Panel -->
+    <div id="dirTournamentsSec" style="display:none;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:20px;">
+        <div class="resume-card" style="padding:24px;">
+          <div class="badge badge-verified" style="margin-bottom:8px;">Sanctioned Tournament</div>
+          <h3 style="font-size:18px;">Hyderabad District T20 Championship</h3>
+          <div style="font-size:13px; color:var(--cyan); margin-top:2px;">Organized by: Telangana Youth Sports Council</div>
+          <div style="font-size:12.5px; color:var(--text-secondary); margin:6px 0 12px;">
+            📍 Gymkhana Grounds, Secunderabad &bull; Completed 28 August 2026 &bull; Final: Warriors XI vs Rising Stars XI
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-gold btn-sm" onclick="TournamentController.openBracketModal('hyd-t20')">
+              🌳 View Knockout Bracket ➔
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('organizer')">
+              Organizer Console ➔
+            </button>
+          </div>
+        </div>
+
+        <div class="resume-card" style="padding:24px;">
+          <div class="badge badge-verified" style="margin-bottom:8px; background:rgba(0,210,255,0.15); color:var(--cyan);">Upcoming Active Tournament</div>
+          <h3 style="font-size:18px;">Telangana State Youth Super League</h3>
+          <div style="font-size:13px; color:var(--cyan); margin-top:2px;">Organized by: Telangana Youth Sports Council</div>
+          <div style="font-size:12.5px; color:var(--text-secondary); margin:6px 0 12px;">
+            📍 Rajiv Gandhi Stadium Complex &bull; 25 Sep - 05 Oct 2026 &bull; Under-21 Bracket
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="UIController.openApplyTrialModal('State Super League Squad Trials', 'Telangana Youth Sports Council')">
+              Register Athlete for Combine ➔
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="UIController.showToast('Official tournament draw scheduled for 20 September 2026.')">
+              View Seedings
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>
+    function switchDirectoryTab(tab) {
+      const tabs = ['players', 'coaches', 'clubs', 'tournaments'];
+      const btns = {
+        players: 'tabBtnPlayers',
+        coaches: 'tabBtnCoaches',
+        clubs: 'tabBtnClubs',
+        tournaments: 'tabBtnTournaments'
+      };
+      const panels = {
+        players: 'dirPlayersSec',
+        coaches: 'dirCoachesSec',
+        clubs: 'dirClubsSec',
+        tournaments: 'dirTournamentsSec'
+      };
+
+      tabs.forEach(t => {
+        document.getElementById(btns[t])?.classList.toggle('active', t === tab);
+        document.getElementById(panels[t]).style.display = t === tab ? 'block' : 'none';
+      });
+    }
+
+    function filterDirectoryPlayers() {
+      const sport = document.getElementById('dSport').value;
+      const pos = document.getElementById('dPosition').value;
+      const cls = document.getElementById('dClassification').value;
+      const minSkill = parseFloat(document.getElementById('dMinSkill').value);
+
+      document.querySelectorAll('#directoryPlayerGrid .talent-card').forEach(card => {
+        const cSport = card.dataset.sport;
+        const cPos = card.dataset.position;
+        const cCls = card.dataset.class;
+        const cSkill = parseFloat(card.dataset.skill);
+
+        let match = true;
+        if (sport !== 'All' && cSport !== sport) match = false;
+        if (pos !== 'All' && cPos !== pos) match = false;
+        if (cls !== 'All' && cCls !== cls) match = false;
+        if (cSkill < minSkill) match = false;
+
+        card.style.display = match ? 'flex' : 'none';
+      });
+    }
+
+    function testSmartMatchRahul() {
+      UIController.openSmartMatchModal({
+        player: DEMO_USERS.player1,
+        match_pct: 94,
+        reasons: [
+          'Same sport: Cricket',
+          'Primary role: Opening Batsman',
+          'Same regional jurisdiction: Hyderabad',
+          'Skill score meets requirement (88/100)',
+          'Currently available for trials',
+          'Strong recent match performance (72 runs in Final)',
+          '🌟 Rising Talent classification bonus'
+        ]
+      });
+    }
+
+    function testSmartMatchArjun() {
+      UIController.openSmartMatchModal({
+        player: DEMO_USERS.player2,
+        match_pct: 91,
+        reasons: [
+          'Same sport: Cricket',
+          'All-rounder versatility',
+          'Same regional jurisdiction: Hyderabad',
+          'Skill score: 84/100',
+          'Emerging Player with verified match record (48 runs, 2 wickets)'
+        ]
+      });
+    }
+
+    function testSmartMatchKiran() {
+      UIController.openSmartMatchModal({
+        player: DEMO_USERS.player3,
+        match_pct: 87,
+        reasons: [
+          'Same sport: Cricket',
+          'Right-arm fast bowler for pace trials',
+          'Same location: Secunderabad / Hyderabad',
+          'High skill test score (87/100)',
+          '🌟 Rising Talent classification bonus'
+        ]
+      });
+    }
+
+    // Check URL parameters for tab selection (e.g. ?tab=rising)
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get('tab');
+      if (tab === 'rising') {
+        switchDirectoryTab('players');
+        document.getElementById('dClassification').value = 'Rising Talent';
+        filterDirectoryPlayers();
+      } else if (tab && ['players', 'coaches', 'clubs', 'tournaments'].includes(tab)) {
+        switchDirectoryTab(tab);
+      }
+    });
+  </script>
+</body>
+</html>
