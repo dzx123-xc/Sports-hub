@@ -633,8 +633,7 @@ def seed_demo_data(conn):
     (1, 'Verification', '🟢 Certificate Verified', 'Your District Under-19 Championship Trophy certificate has been verified by the Admin.', '#certificates', 0, '2026-08-01T10:00:00'),
     (1, 'Performance', '🌟 Classified as Rising Talent', 'Congratulations! Your composite score updated to 88.0 and you are featured in Rising Talent.', '#profile', 1, '2026-08-29T12:00:00'),
     (1, 'Connections', '🤝 New Connection', 'Coach Vikram Rathore accepted your connection request.', '#network', 1, '2026-08-29T11:00:00'),
-    (6, 'Opportunities', 'New Rising Talent Spotlight', 'Rahul Kumar achieved +21% progress and 88 Skill Score in Hyderabad.', '#scout', 0, '2026-08-29T12:00:00'),
-    (10, 'Reports', '🚨 New Report #1024 Filed', 'Coach Vikram Rathore submitted a report regarding unverified certificate submission.', '#reports', 0, '2026-09-03T16:00:00')
+    (6, 'Opportunities', 'New Rising Talent Spotlight', 'Rahul Kumar achieved +21% progress and 88 Skill Score in Hyderabad.', '#scout', 0, '2026-08-29T12:00:00')
     """)
 
     # 17. Reports (Formal investigation workflow)
