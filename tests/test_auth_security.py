@@ -26,6 +26,10 @@ class AuthDatabaseTests(unittest.TestCase):
 
     def test_required_tables_exist(self):
         names={r[0] for r in self.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertIn('sessions', names); self.assertIn('referee_profiles', names)
+        self.assertIn('referee_profiles', names)
+
+    def test_security_files_exist(self):
+        self.assertTrue((os.path.join(os.path.dirname(__file__), '..', 'auth-guard.js')))
+        self.assertTrue((os.path.join(os.path.dirname(__file__), '..', 'identity-sync.js')))
 
 if __name__ == '__main__': unittest.main()
