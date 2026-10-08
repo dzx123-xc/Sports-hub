@@ -30,6 +30,8 @@ USING_POSTGRES = bool(DATABASE_URL)
 PASSWORD_ALGORITHM = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 310_000
 
+SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "false").strip().lower() in ("1", "true", "yes", "on")
+
 def hash_pw(password: str) -> str:
     """Hash passwords using PBKDF2-HMAC-SHA256 with a per-password salt."""
     if not isinstance(password, str) or not password:
@@ -390,7 +392,12 @@ def init_db(force: bool = False):
         cursor.executescript(schema_sql)
 
     conn.commit()
-    seed_demo_data(conn)
+
+    # Never populate a public PostgreSQL deployment with predictable demo passwords
+    # unless the operator explicitly opts in. Local SQLite keeps demo data for tests/development.
+    if not USING_POSTGRES or SEED_DEMO_DATA:
+        seed_demo_data(conn)
+
     if USING_POSTGRES:
         _reset_postgres_sequences(conn)
     conn.close()
