@@ -573,9 +573,9 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 10. Saved Talent
             elif path == '/api/saved-talent':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
                 SELECT st.id as bookmark_id, st.notes, st.saved_at,
                        u.id, u.full_name, u.avatar, u.location,
