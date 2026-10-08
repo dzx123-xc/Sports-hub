@@ -39,12 +39,9 @@ class TestSportsConnectPlatform(unittest.TestCase):
         self.assertIsNotNone(coach)
         self.assertEqual(coach['role'], 'Coach')
 
-        # Check Admin
-        cursor.execute("SELECT id, role, password_hash FROM users WHERE username = 'admin'")
-        admin = cursor.fetchone()
-        self.assertIsNotNone(admin)
-        self.assertEqual(admin['role'], 'Admin')
-        self.assertEqual(admin['password_hash'], hash_pw('admin123'))
+        # Admin is now an environment-only identity and must not be seeded into the database.
+        cursor.execute("SELECT id FROM users WHERE role = 'Admin'")
+        self.assertIsNone(cursor.fetchone())
         conn.close()
 
     def test_02_rising_talent_classification_model(self):
