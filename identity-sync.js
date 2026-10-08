@@ -32,7 +32,7 @@
     }
     if(expected==='Coach'){
       setText(['coachWelcomeName','headerName','sideName'],user.full_name||user.username);
-      setText(['scoutLocation'],location);
+      setText(['scoutLocation'],userLocation);
     }
     if(expected==='Club'){
       setText(['clubWelcomeName','headerName','sideName'],user.full_name||user.username);
