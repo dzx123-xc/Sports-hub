@@ -29,6 +29,16 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("/api/auth/me", text)
         self.assertIn("/api/profile", text)
 
+    def test_server_has_single_authoritative_admin_guard(self):
+        text = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertEqual(text.count("def is_admin_request"), 1)
+        self.assertNotIn("ADMIN_SESSIONS", text)
+
+    def test_postgres_demo_seed_is_opt_in(self):
+        text = (ROOT / "database.py").read_text(encoding="utf-8")
+        self.assertIn('SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "false")', text)
+        self.assertIn("if not USING_POSTGRES or SEED_DEMO_DATA:", text)
+
     def test_protected_dashboards_load_security_scripts(self):
         for page in [
             "player-dashboard.html", "coach-dashboard.html", "club-dashboard.html",
