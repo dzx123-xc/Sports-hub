@@ -31,7 +31,7 @@ class TestSportsConnectPlatform(unittest.TestCase):
         user = cursor.fetchone()
         self.assertIsNotNone(user, "Rahul Kumar user must exist")
         self.assertEqual(user['role'], 'Player')
-        self.assertEqual(user['password_hash'], hash_pw('password123'))
+        self.assertTrue(__import__('database').verify_pw('password123', user['password_hash']))
 
         # Check Coach Vikram
         cursor.execute("SELECT id, role FROM users WHERE username = 'coachvikram'")
