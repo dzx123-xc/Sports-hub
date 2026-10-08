@@ -850,7 +850,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 if not username or not email or not phone or not password or not full_name:
                     return self.send_json({"error": "All required fields must be filled."}, 400)
                 import re
-                if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*]).{8,}$', password):
+                if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$', password):
                     return self.send_json({"error": "Password must be at least 8 characters and include uppercase, lowercase, number, and special character."}, 400)
                 if cursor.fetchone():
                     return self.send_json({"error": "Username, Email or Phone already registered."}, 409)
