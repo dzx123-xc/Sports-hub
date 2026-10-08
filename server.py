@@ -22,6 +22,37 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ADMIN_USERNAME = 'admin_123'
 ADMIN_PASSWORD = 'ASDFG@123'
 ADMIN_SESSIONS = set()
+USER_SESSIONS = {}
+
+PROTECTED_ROLE_PAGES = {
+    '/player-dashboard.html': 'Player',
+    '/coach-dashboard.html': 'Coach',
+    '/club-dashboard.html': 'Club',
+    '/organizer-dashboard.html': 'Organizer',
+    '/referee-dashboard.html': 'Referee',
+}
+
+def _cookie_value(handler, name):
+    for part in handler.headers.get('Cookie', '').split(';'):
+        part = part.strip()
+        if part.startswith(name + '='):
+            return urllib.parse.unquote(part.split('=', 1)[1])
+    return None
+
+def current_user_id(handler):
+    token = _cookie_value(handler, 'sc_session')
+    return USER_SESSIONS.get(token)
+
+def issue_user_session(user_id):
+    token = secrets.token_urlsafe(32)
+    USER_SESSIONS[token] = int(user_id)
+    return token
+
+def clear_user_session(handler):
+    token = _cookie_value(handler, 'sc_session')
+    if token:
+        USER_SESSIONS.pop(token, None)
+
 
 
 def calculate_player_classification(skill_score, perf_score, progress_pct, major_matches, achievements_count=1):
@@ -144,10 +175,13 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-    def send_json(self, data, status=200):
+    def send_json(self, data, status=200, cookies=None):
         body = json.dumps(data, default=str).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
+        if cookies:
+            for cookie in cookies:
+                self.send_header('Set-Cookie', cookie)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -178,6 +212,22 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
+        # Role dashboards are server-protected as well as client-guarded.
+        if path in PROTECTED_ROLE_PAGES:
+            uid = current_user_id(self)
+            if not uid:
+                self.send_response(302)
+                self.send_header('Location', '/index.html')
+                self.end_headers()
+                return
+            with get_db() as auth_conn:
+                row = auth_conn.execute('SELECT role, status FROM users WHERE id = ?', (uid,)).fetchone()
+            if not row or row['status'] == 'suspended' or row['role'] != PROTECTED_ROLE_PAGES[path]:
+                self.send_response(302)
+                self.send_header('Location', '/index.html')
+                self.end_headers()
+                return
+
         # Serve static assets
         if path == '/' or path == '':
             self.path = '/index.html'
@@ -201,48 +251,36 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         cursor = conn.cursor()
 
         try:
-            # 1. Auth Me
+            # 1. Auth Me - server session is authoritative.
             if path == '/api/auth/me':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
+
                 cursor.execute("""
-                SELECT u.id, u.username, u.email, u.phone, u.role, u.full_name, u.avatar, 
-                       u.location, u.state, u.district, u.bio, u.is_verified, u.status
+                SELECT u.id, u.username, u.email, u.phone, u.role, u.full_name, u.avatar,
+                       u.location, u.state, u.district, u.city, u.village, u.availability,
+                       u.bio, u.is_verified, u.status
                 FROM users u WHERE u.id = ?
                 """, (user_id,))
                 user = cursor.fetchone()
                 if not user:
-                    return self.send_json({"error": "User not found"}, 404)
+                    clear_user_session(self)
+                    return self.send_json({"error": "Session user not found."}, 401)
+
                 user_dict = dict(user)
-
-                # Fetch role-specific details
-                if user_dict['role'] == 'Player':
-                    cursor.execute("SELECT * FROM player_profiles WHERE user_id = ?", (user_id,))
-                    p = cursor.fetchone()
-                    if p:
-                        user_dict['player_profile'] = dict(p)
-                elif user_dict['role'] == 'Coach':
-                    cursor.execute("SELECT * FROM coach_profiles WHERE user_id = ?", (user_id,))
-                    c = cursor.fetchone()
-                    if c:
-                        user_dict['coach_profile'] = dict(c)
-                elif user_dict['role'] == 'Club':
-                    cursor.execute("SELECT * FROM club_profiles WHERE user_id = ?", (user_id,))
-                    c = cursor.fetchone()
-                    if c:
-                        user_dict['club_profile'] = dict(c)
-                elif user_dict['role'] == 'Organizer':
-                    cursor.execute("SELECT * FROM organizer_profiles WHERE user_id = ?", (user_id,))
-                    o = cursor.fetchone()
-                    if o:
-                        user_dict['organizer_profile'] = dict(o)
-
-                elif user_dict['role'] == 'Referee':
-                    cursor.execute("SELECT * FROM referee_profiles WHERE user_id = ?", (user_id,))
-                    r = cursor.fetchone()
-                    if r:
-                        user_dict['referee_profile'] = dict(r)
+                role_table = {
+                    'Player': ('player_profiles', 'player_profile'),
+                    'Coach': ('coach_profiles', 'coach_profile'),
+                    'Club': ('club_profiles', 'club_profile'),
+                    'Organizer': ('organizer_profiles', 'organizer_profile'),
+                    'Referee': ('referee_profiles', 'referee_profile'),
+                }
+                if user_dict['role'] in role_table:
+                    table, key = role_table[user_dict['role']]
+                    row = cursor.execute(f"SELECT * FROM {table} WHERE user_id = ?", (user_id,)).fetchone()
+                    if row:
+                        user_dict[key] = dict(row)
 
                 return self.send_json({"user": user_dict})
 
@@ -594,7 +632,66 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         cursor = conn.cursor()
 
         try:
-            # 1. Login
+            # 1. Update authenticated profile
+            if path == '/api/profile':
+                user_id = current_user_id(self)
+                if not user_id:
+                    return self.send_json({'error': 'Authentication required.'}, 401)
+
+                user = cursor.execute('SELECT id, role FROM users WHERE id = ?', (user_id,)).fetchone()
+                if not user:
+                    return self.send_json({'error': 'Authenticated user not found.'}, 401)
+
+                allowed_user = ['full_name','email','phone','location','state','district','city','village','availability','bio']
+                changes = {}
+                for field in allowed_user:
+                    if field in body:
+                        value = body.get(field)
+                        if value is not None:
+                            changes[field] = str(value).strip()
+
+                if 'full_name' in changes and not changes['full_name']:
+                    return self.send_json({'error': 'Full name cannot be empty.'}, 400)
+
+                if 'email' in changes:
+                    email = changes['email'].lower()
+                    other = cursor.execute('SELECT id FROM users WHERE email = ? AND id != ?', (email, user_id)).fetchone()
+                    if other:
+                        return self.send_json({'error': 'Email already registered.'}, 409)
+                    changes['email'] = email
+
+                if changes:
+                    assignments = ', '.join(f'{k} = ?' for k in changes)
+                    cursor.execute(f'UPDATE users SET {assignments} WHERE id = ?', (*changes.values(), user_id))
+
+                role = user['role']
+                role_fields = {
+                    'Player': ('player_profiles', ['sport','position','experience_years','age_group','preferred_role','availability']),
+                    'Coach': ('coach_profiles', ['sport','experience_years','specialization','certifications','current_org','availability']),
+                    'Club': ('club_profiles', ['sport','club_name','established_year','home_ground','division']),
+                    'Organizer': ('organizer_profiles', ['organization_name','sport','registration_no']),
+                    'Referee': ('referee_profiles', ['sport','level','official_role','experience_years','certification','availability'])
+                }
+                if role in role_fields:
+                    table, fields = role_fields[role]
+                    role_values = {k: body[k] for k in fields if k in body and body[k] is not None}
+                    if 'availability' in role_values:
+                        role_values['availability'] = str(role_values['availability']).strip()
+                    if role_values:
+                        assignments = ', '.join(f'{k} = ?' for k in role_values)
+                        cursor.execute(f'UPDATE {table} SET {assignments} WHERE user_id = ?', (*role_values.values(), user_id))
+
+                conn.commit()
+                # Reuse /api/auth/me representation after update by redirecting through a small in-process query.
+                row = cursor.execute('SELECT id, username, email, phone, role, full_name, avatar, location, state, district, city, village, availability, bio, is_verified, status FROM users WHERE id = ?', (user_id,)).fetchone()
+                result = dict(row)
+                table_map = {'Player':'player_profiles','Coach':'coach_profiles','Club':'club_profiles','Organizer':'organizer_profiles','Referee':'referee_profiles'}
+                if role in table_map:
+                    prow = cursor.execute(f'SELECT * FROM {table_map[role]} WHERE user_id = ?', (user_id,)).fetchone()
+                    if prow: result[role.lower() + '_profile'] = dict(prow)
+                return self.send_json({'success': True, 'user': result})
+
+            # 2. Login
             if path == '/api/auth/login':
                 identifier = str(body.get('identifier', '')).strip()
                 password = str(body.get('password', '')).strip()
@@ -637,29 +734,29 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 if user_dict['status'] == 'suspended':
                     return self.send_json({"error": "Account has been suspended. Please contact integrity support."}, 403)
                 del user_dict['password_hash']
-                return self.send_json({"success": True, "user": user_dict})
+                token = issue_user_session(user_dict['id'])
+                return self.send_json(
+                    {"success": True, "user": user_dict},
+                    200,
+                    [f'sc_session={urllib.parse.quote(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400']
+                )
 
             # Admin logout invalidates the server-side admin session token.
             elif path == '/api/auth/logout':
-                cookie = self.headers.get('Cookie', '')
-                token = None
-                for part in cookie.split(';'):
-                    part = part.strip()
-                    if part.startswith('sc_admin_session='):
-                        token = part.split('=', 1)[1]
-                        break
-                if token:
-                    ADMIN_SESSIONS.discard(token)
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Set-Cookie', 'sc_admin_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax')
-                payload = json.dumps({'success': True}).encode('utf-8')
-                self.send_header('Content-Length', str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-                return
+                clear_user_session(self)
+                admin_token = _cookie_value(self, 'sc_admin_session')
+                if admin_token:
+                    ADMIN_SESSIONS.discard(admin_token)
+                return self.send_json(
+                    {'success': True},
+                    200,
+                    [
+                        'sc_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+                        'sc_admin_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+                    ]
+                )
 
-            # 2. Register
+            # 3. Register
             elif path == '/api/auth/register':
                 role = body.get('role', 'Player')
                 username = body.get('username', '').strip().lower()
