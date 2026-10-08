@@ -6,23 +6,101 @@ matches, tests, certificates, trials, and verifications.
 
 import sqlite3
 import hashlib
+import hmac
+import base64
 import json
 import os
+import secrets
+import logging
 from datetime import datetime
 
+try:
+    import psycopg2
+    from psycopg2.extras import DictCursor
+except ImportError:
+    psycopg2 = None
+    DictCursor = None
+
+logger = logging.getLogger(__name__)
+
 DB_PATH = os.path.join(os.path.dirname(__file__), "sportsconnect.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+USING_POSTGRES = bool(DATABASE_URL)
+
+PASSWORD_ALGORITHM = "pbkdf2_sha256"
+PASSWORD_ITERATIONS = 310_000
 
 def hash_pw(password: str) -> str:
-    """Hash password using SHA-256 for demo environment."""
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    """Hash passwords using PBKDF2-HMAC-SHA256 with a per-password salt."""
+    if not isinstance(password, str) or not password:
+        raise ValueError("Password must be a non-empty string")
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_ITERATIONS)
+    return "{}${}${}${}".format(PASSWORD_ALGORITHM, PASSWORD_ITERATIONS, base64.urlsafe_b64encode(salt).decode("ascii"), base64.urlsafe_b64encode(digest).decode("ascii"))
+
+def verify_pw(password: str, stored_hash: str) -> bool:
+    """Verify PBKDF2 hashes and legacy SHA-256 hashes during migration."""
+    if not password or not stored_hash: return False
+    if stored_hash.startswith(PASSWORD_ALGORITHM + "$"):
+        try:
+            algorithm, iterations, salt_b64, digest_b64 = stored_hash.split("$", 3)
+            salt = base64.urlsafe_b64decode(salt_b64.encode("ascii"))
+            expected = base64.urlsafe_b64decode(digest_b64.encode("ascii"))
+            actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iterations))
+            return hmac.compare_digest(actual, expected)
+        except (ValueError, TypeError): return False
+    legacy = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(legacy, stored_hash)
+
+class CompatCursor:
+    _LASTROWID_TABLES = {"users", "certificates", "matches", "trials", "reports"}
+    def __init__(self, raw_cursor, postgres=False):
+        self._cursor, self._postgres, self._lastrowid = raw_cursor, postgres, None
+    @staticmethod
+    def _replace_placeholders(query): return query.replace("?", "%s")
+    def execute(self, query, params=None):
+        if not self._postgres: return self._cursor.execute(query, params or ())
+        q = query
+        if "INSERT OR REPLACE INTO saved_talent" in q.upper():
+            q = q.replace("INSERT OR REPLACE INTO saved_talent", "INSERT INTO saved_talent")
+            q = q.replace("VALUES (?, ?, ?, ?)", "VALUES (?, ?, ?, ?) ON CONFLICT (user_id, player_id) DO UPDATE SET notes = EXCLUDED.notes, saved_at = EXCLUDED.saved_at")
+        q = self._replace_placeholders(q)
+        result = self._cursor.execute(q, params or ())
+        import re
+        m = re.match(r"\s*INSERT\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)", q, re.I)
+        table = m.group(1).lower() if m else None
+        if table in self._LASTROWID_TABLES:
+            self._cursor.execute("SELECT currval(pg_get_serial_sequence(%s, 'id')) AS id", (table,))
+            row = self._cursor.fetchone()
+            self._lastrowid = row["id"] if row else None
+        return result
+    def executemany(self, query, seq_of_params):
+        if self._postgres: query = self._replace_placeholders(query)
+        return self._cursor.executemany(query, seq_of_params)
+    @property
+    def lastrowid(self): return self._lastrowid if self._postgres else self._cursor.lastrowid
+    def __getattr__(self, name): return getattr(self._cursor, name)
+
+class CompatConnection:
+    def __init__(self, raw_connection): self._conn, self._postgres = raw_connection, USING_POSTGRES
+    def cursor(self):
+        return CompatCursor(self._conn.cursor(cursor_factory=DictCursor), True) if self._postgres else CompatCursor(self._conn.cursor(), False)
+    def commit(self): return self._conn.commit()
+    def rollback(self): return self._conn.rollback()
+    def close(self): return self._conn.close()
+    def __enter__(self): self._conn.__enter__(); return self
+    def __exit__(self, exc_type, exc_value, traceback): return self._conn.__exit__(exc_type, exc_value, traceback)
 
 def get_db():
+    if USING_POSTGRES:
+        if psycopg2 is None: raise RuntimeError("psycopg2-binary is required when DATABASE_URL is configured.")
+        return CompatConnection(psycopg2.connect(DATABASE_URL, sslmode=os.getenv("DB_SSLMODE", "require"), connect_timeout=10))
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    return CompatConnection(conn)
 
 def init_db(force: bool = False):
-    if force and os.path.exists(DB_PATH):
+    if force and not USING_POSTGRES and os.path.exists(DB_PATH):
         try:
             os.remove(DB_PATH)
         except Exception:
@@ -31,7 +109,7 @@ def init_db(force: bool = False):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.executescript("""
+    schema_sql = """
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -80,6 +158,7 @@ def init_db(force: bool = False):
         specialization TEXT,
         certifications TEXT,
         current_org TEXT,
+        availability TEXT,
         verification_status TEXT DEFAULT 'verified', -- 'verified', 'pending', 'rejected'
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     );
@@ -290,12 +369,39 @@ def init_db(force: bool = False):
         connections_visibility TEXT DEFAULT 'public',
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     );
-    """)
+
+    CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token_hash TEXT UNIQUE NOT NULL,
+        user_id INTEGER,
+        role TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+    """
+    if USING_POSTGRES:
+        # Translate only SQLite-specific auto-increment declarations.
+        postgres_schema = schema_sql.replace(
+            "INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY"
+        )
+        cursor.execute(postgres_schema)
+    else:
+        cursor.executescript(schema_sql)
 
     conn.commit()
     seed_demo_data(conn)
+    if USING_POSTGRES:
+        _reset_postgres_sequences(conn)
     conn.close()
     print("Database initialized successfully.")
+
+def _reset_postgres_sequences(conn):
+    tables = ["users","sports_tests","certificates","tournaments","matches","match_player_stats","connections","messages","trials","trial_applications","saved_talent","notifications","reports","sessions"]
+    cursor = conn.cursor()
+    for table in tables:
+        cursor.execute("SELECT setval(pg_get_serial_sequence(%s, 'id'), COALESCE((SELECT MAX(id) FROM " + table + "), 1), true)", (table,))
+    conn.commit()
 
 def seed_demo_data(conn):
     cursor = conn.cursor()
@@ -325,8 +431,6 @@ def seed_demo_data(conn):
         (8, 'deccangladiator', 'info@deccangladiator.com', '+91 98765 33333', hash_pw('password123'), 'Club', 'Deccan Gladiators FC', '⚽', 'Hyderabad', 'Telangana', 'Gachibowli', 'Top-tier football club cultivating young youth talent through high-intensity tactical conditioning.', 1, 'active', now),
         # id=9: Telangana Youth Sports Council (Organizer)
         (9, 'tysports', 'tournaments@tysports.org', '+91 98765 44444', hash_pw('password123'), 'Organizer', 'Telangana Youth Sports Council', '🏆', 'Hyderabad', 'Telangana', 'Hyderabad', 'Apex organizing body for verified district tournaments, school championships, and talent evaluation leagues.', 1, 'active', now),
-        # id=10: SportsConnect Administrator
-        (10, 'admin', 'admin@sportsconnect.com', '+91 98765 99999', hash_pw('admin123'), 'Admin', 'Chief Sports Verifier (Admin)', '🛡️', 'Hyderabad', 'Telangana', 'Headquarters', 'Official integrity desk responsible for verifying certificates, official match scorecards, and platform compliance.', 1, 'active', now)
     ]
 
     cursor.executemany("""

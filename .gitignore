@@ -1,4 +1,11 @@
 __pycache__/
 *.pyc
-.env
 .venv/
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.pytest_cache/

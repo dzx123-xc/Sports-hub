@@ -1,28 +1,40 @@
 """
 SportsConnect Full-Stack Server
 Provides RESTful APIs for the sports networking ecosystem and serves UI assets.
-Built with Python 3 standard library (http.server, sqlite3, json, hashlib).
+Built with Python 3 standard library plus PostgreSQL support via psycopg2.
 """
 
 import http.server
 import socketserver
-import sqlite3
 import json
 import urllib.parse
 import os
 import mimetypes
 import secrets
-from datetime import datetime
-from database import DB_PATH, get_db, hash_pw, init_db
+import hashlib
+import logging
+from datetime import datetime, timedelta
+from database import DB_PATH, get_db, hash_pw, verify_pw, init_db, USING_POSTGRES
 
-PORT = 8000
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("sportsconnect")
+
+PORT = int(os.getenv("PORT", "8000"))
+HOST = os.getenv("HOST", "0.0.0.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Single authorized administrator. Admin accounts cannot be created through public registration.
-ADMIN_USERNAME = 'admin_123'
-ADMIN_PASSWORD = 'ASDFG@123'
-ADMIN_SESSIONS = set()
-USER_SESSIONS = {}
+# Admin credentials are deployment secrets, never source-code credentials.
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin_123")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    logger.warning("ADMIN_PASSWORD is not configured; admin login is disabled.")
+
+SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true" if os.getenv("RAILWAY_ENVIRONMENT_NAME") else "false")
+COOKIE_SECURE_FLAG = "; Secure" if COOKIE_SECURE.lower() in ("1", "true", "yes") else ""
 
 PROTECTED_ROLE_PAGES = {
     '/player-dashboard.html': 'Player',
@@ -39,22 +51,62 @@ def _cookie_value(handler, name):
             return urllib.parse.unquote(part.split('=', 1)[1])
     return None
 
+def _token_hash(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
 def current_user_id(handler):
     token = _cookie_value(handler, 'sc_session')
-    return USER_SESSIONS.get(token)
+    if not token: return None
+    conn = get_db()
+    try:
+        row = conn.cursor().execute("SELECT user_id FROM sessions WHERE token_hash = ? AND role = 'user' AND expires_at > ?", (_token_hash(token), datetime.utcnow().isoformat())).fetchone()
+        return int(row["user_id"]) if row and row["user_id"] is not None else None
+    finally:
+        conn.close()
 
 def issue_user_session(user_id):
     token = secrets.token_urlsafe(32)
-    USER_SESSIONS[token] = int(user_id)
+    now = datetime.utcnow()
+    expires = now + timedelta(hours=SESSION_TTL_HOURS)
+    conn = get_db()
+    try:
+        conn.cursor().execute("INSERT INTO sessions (token_hash, user_id, role, expires_at, created_at) VALUES (?, ?, 'user', ?, ?)", (_token_hash(token), int(user_id), expires.isoformat(), now.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+    return token
+
+def issue_admin_session():
+    token = secrets.token_urlsafe(32)
+    now = datetime.utcnow()
+    expires = now + timedelta(hours=SESSION_TTL_HOURS)
+    conn = get_db()
+    try:
+        conn.cursor().execute("INSERT INTO sessions (token_hash, user_id, role, expires_at, created_at) VALUES (?, NULL, 'admin', ?, ?)", (_token_hash(token), expires.isoformat(), now.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
     return token
 
 def clear_user_session(handler):
     token = _cookie_value(handler, 'sc_session')
     if token:
-        USER_SESSIONS.pop(token, None)
+        conn = get_db()
+        try:
+            conn.cursor().execute("DELETE FROM sessions WHERE token_hash = ?", (_token_hash(token),))
+            conn.commit()
+        finally:
+            conn.close()
 
-
-
+def is_admin_request(handler):
+    token = _cookie_value(handler, 'sc_admin_session')
+    if not token: return False
+    conn = get_db()
+    try:
+        row = conn.cursor().execute("SELECT 1 FROM sessions WHERE token_hash = ? AND role = 'admin' AND expires_at > ?", (_token_hash(token), datetime.utcnow().isoformat())).fetchone()
+        return bool(row)
+    finally:
+        conn.close()
 def calculate_player_classification(skill_score, perf_score, progress_pct, major_matches, achievements_count=1):
     """
     Scoring model:
@@ -165,14 +217,12 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=BASE_DIR, **kwargs)
 
     def end_headers(self):
-        # Enable CORS and disable aggressive caching for API
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        # Frontend and API are served from the same origin; wildcard CORS is unnecessary.
         super().end_headers()
 
     def do_OPTIONS(self):
-        self.send_response(200)
+        self.send_response(204)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def send_json(self, data, status=200, cookies=None):
@@ -201,6 +251,16 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
 
+        if path == '/health':
+            try:
+                health_conn = get_db()
+                health_conn.cursor().execute("SELECT 1").fetchone()
+                health_conn.close()
+                return self.send_json({"status": "ok", "database": "postgresql" if USING_POSTGRES else "sqlite"})
+            except Exception:
+                logger.exception("Health check failed")
+                return self.send_json({"status": "error"}, 503)
+        
         if path.startswith('/api/'):
             if path.startswith('/api/admin/') and not is_admin_request(self):
                 return self.send_json({'error': 'Admin authorization required.'}, 403)
@@ -344,7 +404,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             elif path.startswith('/api/players/'):
                 player_id = int(path.split('/')[-1])
                 cursor.execute("""
-                SELECT u.id, u.username, u.email, u.phone, u.full_name, u.avatar, u.location, u.state, u.district, u.bio, u.is_verified,
+                SELECT u.id, u.username, u.full_name, u.avatar, u.location, u.state, u.district, u.bio, u.is_verified,
                        p.sport, p.position, p.experience_years, p.age_group, p.dob, p.preferred_role,
                        p.availability, p.rating, p.classification, p.skill_score, p.performance_score,
                        p.progress_pct, p.major_matches, p.verified_local_matches, p.consistency_score
@@ -466,9 +526,9 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 7. Connections
             elif path == '/api/connections':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
                 SELECT c.id, c.status, c.created_at,
                        CASE WHEN c.requester_id = ? THEN c.recipient_id ELSE c.requester_id END AS other_user_id,
@@ -483,10 +543,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 8. Messages
             elif path == '/api/messages':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 other_id = qs.get('other_id', [None])[0]
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 if other_id:
                     cursor.execute("""
                     SELECT m.*, u.full_name as sender_name, u.avatar as sender_avatar
@@ -508,9 +568,9 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 9. Notifications
             elif path == '/api/notifications':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
                 SELECT * FROM notifications WHERE user_id = ? ORDER BY timestamp DESC LIMIT 30
                 """, (user_id,))
@@ -519,9 +579,9 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 10. Saved Talent
             elif path == '/api/saved-talent':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
                 SELECT st.id as bookmark_id, st.notes, st.saved_at,
                        u.id, u.full_name, u.avatar, u.location,
@@ -537,8 +597,8 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 11. Reports (Admin / User)
             elif path == '/api/reports':
-                user_id = qs.get('user_id', [None])[0]
-                is_admin = qs.get('admin', ['0'])[0] == '1'
+                user_id = current_user_id(self)
+                is_admin = is_admin_request(self)
                 if is_admin:
                     cursor.execute("""
                     SELECT r.*, 
@@ -558,7 +618,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                     ORDER BY r.id DESC
                     """, (user_id,))
                 else:
-                    return self.send_json({"error": "user_id or admin=1 required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 reports = [dict(r) for r in cursor.fetchall()]
                 return self.send_json({"reports": reports})
 
@@ -623,6 +683,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 return self.send_json({"error": "Endpoint not found"}, 404)
 
+        except Exception:
+            conn.rollback()
+            logger.exception("Unhandled GET API error: %s", path)
+            return self.send_json({"error": "Internal server error."}, 500)
         finally:
             conn.close()
 
@@ -701,9 +765,8 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Admin is a separate protected identity. No database/demo admin can authenticate.
                 if identifier.lower() == ADMIN_USERNAME.lower() or identifier.lower() == 'admin@sportsconnect.com':
-                    if identifier.lower() == ADMIN_USERNAME.lower() and password == ADMIN_PASSWORD:
-                        token = secrets.token_urlsafe(32)
-                        ADMIN_SESSIONS.add(token)
+                    if ADMIN_PASSWORD and identifier.lower() == ADMIN_USERNAME.lower() and password == ADMIN_PASSWORD:
+                        token = issue_admin_session()
                         admin_user = {
                             'id': 0, 'username': ADMIN_USERNAME, 'email': 'admin@sportsconnect.local',
                             'phone': '', 'role': 'Admin', 'full_name': 'SportsConnect Administrator',
@@ -711,7 +774,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                         }
                         self.send_response(200)
                         self.send_header('Content-Type', 'application/json')
-                        self.send_header('Set-Cookie', f'sc_admin_session={token}; Path=/; HttpOnly; SameSite=Lax')
+                        self.send_header('Set-Cookie', f'sc_admin_session={token}; Path=/; HttpOnly; SameSite=Lax{COOKIE_SECURE_FLAG}; Max-Age={SESSION_TTL_HOURS*3600}')
                         payload = json.dumps({'success': True, 'user': admin_user}).encode('utf-8')
                         self.send_header('Content-Length', str(len(payload)))
                         self.end_headers()
@@ -722,11 +785,16 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 cursor.execute("""
                 SELECT id, username, email, phone, password_hash, role, full_name, avatar, location, status
                 FROM users
-                WHERE (email = ? OR phone = ? OR username = ?) AND password_hash = ?
-                """, (identifier.lower(), identifier, identifier.lower(), hash_pw(password)))
+                WHERE lower(email) = ? OR phone = ? OR lower(username) = ?
+                """, (identifier.lower(), identifier, identifier.lower()))
                 user = cursor.fetchone()
-                if not user:
+                if not user or not verify_pw(password, user["password_hash"]):
                     return self.send_json({"error": "Invalid credentials. If this email is new, create a new account.", "account_exists": False if '@' in identifier else None}, 401)
+
+                # Seamlessly upgrade an old SHA-256 password after a successful login.
+                if not str(user["password_hash"]).startswith("pbkdf2_sha256$"):
+                    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_pw(password), user["id"]))
+                    conn.commit()
 
                 user_dict = dict(user)
                 if user_dict['role'] == 'Admin':
@@ -738,7 +806,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json(
                     {"success": True, "user": user_dict},
                     200,
-                    [f'sc_session={urllib.parse.quote(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400']
+                    [f'sc_session={urllib.parse.quote(token)}; Path=/; HttpOnly; SameSite=Lax{COOKIE_SECURE_FLAG}; Max-Age={SESSION_TTL_HOURS*3600}']
                 )
 
             # Admin logout invalidates the server-side admin session token.
@@ -746,13 +814,18 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 clear_user_session(self)
                 admin_token = _cookie_value(self, 'sc_admin_session')
                 if admin_token:
-                    ADMIN_SESSIONS.discard(admin_token)
+                    conn2 = get_db()
+                    try:
+                        conn2.cursor().execute("DELETE FROM sessions WHERE token_hash = ? AND role = 'admin'", (_token_hash(admin_token),))
+                        conn2.commit()
+                    finally:
+                        conn2.close()
                 return self.send_json(
                     {'success': True},
                     200,
                     [
-                        'sc_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
-                        'sc_admin_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'
+                        f'sc_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{COOKIE_SECURE_FLAG}',
+                        f'sc_admin_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{COOKIE_SECURE_FLAG}'
                     ]
                 )
 
@@ -777,8 +850,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 if not username or not email or not phone or not password or not full_name:
                     return self.send_json({"error": "All required fields must be filled."}, 400)
                 import re
-                if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*]).{8,}                cursor.execute("SELECT id FROM users WHERE username = ? OR email = ? OR phone = ?", (username, email, phone))
-                if cursor.fetchone():
+                if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}
                     return self.send_json({"error": "Username, Email or Phone already registered."}, 409)
 
                 now = datetime.now().isoformat()
@@ -859,7 +931,8 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                             'verified_local_matches': profile['verified_local_matches']
                         })
                 conn.commit()
-                return self.send_json({"success": True, "user_id": user_id, "user": created_user, "message": "Account created successfully."})
+                session_token = issue_user_session(user_id)
+                return self.send_json({"success": True, "user_id": user_id, "user": created_user, "message": "Account created successfully."}, 200, [f'sc_session={urllib.parse.quote(session_token)}; Path=/; HttpOnly; SameSite=Lax{COOKIE_SECURE_FLAG}; Max-Age={SESSION_TTL_HOURS*3600}'])
 
             # 3. Smart Matching Engine
             elif path == '/api/matching':
@@ -889,7 +962,12 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 4. Upload / Submit Certificate
             elif path == '/api/certificates':
-                player_id = body.get('player_id')
+                player_id = int(body.get('player_id') or 0)
+                auth_id = current_user_id(self)
+                if not auth_id and not is_admin_request(self):
+                    return self.send_json({"error": "Authentication required."}, 401)
+                if not is_admin_request(self) and player_id != auth_id:
+                    return self.send_json({"error": "You may only manage your own certificates."}, 403)
                 title = body.get('title')
                 issuing_org = body.get('issuing_org')
                 year = int(body.get('year', 2025))
@@ -959,7 +1037,13 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 6. Official Match Submission (By Organizer/Club)
             elif path == '/api/matches':
-                organizer_name = body.get('organizer_name', 'Authorized Organizer')
+                auth_id = current_user_id(self)
+                if not auth_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
+                auth_row = cursor.execute("SELECT role, full_name FROM users WHERE id = ?", (auth_id,)).fetchone()
+                if not auth_row or auth_row["role"] not in ("Organizer", "Club") and not is_admin_request(self):
+                    return self.send_json({"error": "Only organizers, clubs, or admins may submit official matches."}, 403)
+                organizer_name = auth_row["full_name"] if auth_row else "Authorized Organizer"
                 sport = body.get('sport', 'Cricket')
                 title = body.get('title')
                 team_a = body.get('team_a')
@@ -990,7 +1074,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                     cursor.execute("""
                     UPDATE player_profiles 
                     SET verified_local_matches = verified_local_matches + 1,
-                        performance_score = ROUND((performance_score * 0.8) + (? * 0.2), 1)
+                        performance_score = ROUND(CAST((performance_score * 0.8) + (? * 0.2) AS numeric), 1)
                     WHERE user_id = ?
                     """, (rating * 10, p_id))
 
@@ -1006,7 +1090,12 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 7. Post Trial & Trial Application
             elif path == '/api/trials':
-                creator_id = body.get('creator_id')
+                creator_id = int(body.get('creator_id') or 0)
+                auth_id = current_user_id(self)
+                if not auth_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
+                if creator_id != auth_id:
+                    return self.send_json({"error": "You may only create trials for your own account."}, 403)
                 sport = body.get('sport', 'Cricket')
                 position = body.get('position', 'Batsman')
                 title = body.get('title')
@@ -1027,10 +1116,16 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             elif path == '/api/trials/invite':
                 trial_id = body.get('trial_id')
                 player_id = body.get('player_id')
-                creator_id = body.get('creator_id')
+                creator_id = current_user_id(self)
+                if not creator_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
 
-                cursor.execute("SELECT title, trial_date, location FROM trials WHERE id = ?", (trial_id,))
+                cursor.execute("SELECT title, trial_date, location, creator_id FROM trials WHERE id = ?", (trial_id,))
                 t = cursor.fetchone()
+                if not t:
+                    return self.send_json({"error": "Trial not found."}, 404)
+                if int(t["creator_id"]) != int(creator_id):
+                    return self.send_json({"error": "You may only invite players to your own trials."}, 403)
                 now = datetime.now().isoformat()
 
                 cursor.execute("""
@@ -1062,8 +1157,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 8. Connections & Messages
             elif path == '/api/connections':
-                requester_id = body.get('requester_id')
+                requester_id = current_user_id(self)
                 recipient_id = body.get('recipient_id')
+                if not requester_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
 
                 now = datetime.now().isoformat()
                 cursor.execute("""
@@ -1091,8 +1188,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"success": True, "status": status})
 
             elif path == '/api/messages':
-                sender_id = body.get('sender_id')
+                sender_id = current_user_id(self)
                 recipient_id = body.get('recipient_id')
+                if not sender_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
                 message_text = body.get('message_text')
                 msg_type = body.get('message_type', 'text')
                 metadata = body.get('metadata', None)
@@ -1116,8 +1215,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 9. Bookmark / Save Talent
             elif path == '/api/saved-talent':
-                user_id = body.get('user_id')
+                user_id = current_user_id(self)
                 player_id = body.get('player_id')
+                if not user_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
                 notes = body.get('notes', 'Saved from talent search')
                 action = body.get('action', 'save') # 'save' or 'unsave'
 
@@ -1135,8 +1236,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 10. Report System
             elif path == '/api/reports':
-                reporter_id = body.get('reporter_id')
+                reporter_id = current_user_id(self)
                 reported_user_id = body.get('reported_user_id')
+                if not reporter_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
                 item_type = body.get('reported_item_type', 'profile')
                 item_id = body.get('reported_item_id')
                 report_type = body.get('report_type', 'fake_profile')
@@ -1202,510 +1305,36 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 return self.send_json({"error": "Endpoint not found"}, 404)
 
+        except Exception:
+            conn.rollback()
+            logger.exception("Unhandled POST API error: %s", path)
+            return self.send_json({"error": "Internal server error."}, 500)
         finally:
             conn.close()
 
 def run_server():
     init_db(force=False)
-    # Lightweight migrations for existing databases.
-    conn = get_db(); c = conn.cursor()
-    for statement in [
-        "ALTER TABLE users ADD COLUMN city TEXT",
-        "ALTER TABLE users ADD COLUMN village TEXT",
-        "ALTER TABLE users ADD COLUMN availability TEXT",
-        "ALTER TABLE coach_profiles ADD COLUMN availability TEXT"
-    ]:
-        try: c.execute(statement)
-        except Exception: pass
-    conn.commit(); conn.close()
 
-    # Remove legacy/demo Admin records. The only Admin identity is the protected credential above.
+    # Remove obsolete database Admin records. The real admin identity is environment-only.
     conn = get_db()
     try:
-        conn.execute("DELETE FROM users WHERE role = 'Admin' OR lower(username) IN ('admin', 'admin@sportsconnect.com')")
+        conn.cursor().execute("DELETE FROM users WHERE role = 'Admin' OR lower(username) IN ('admin', 'admin@sportsconnect.com')")
         conn.commit()
     finally:
         conn.close()
+
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", PORT), SportsConnectHandler) as httpd:
-        print("=====================================================")
-        print(f"SportsConnect Platform Server Running on http://localhost:{PORT}")
-        print(f"Database: {DB_PATH}")
-        print("Press Ctrl+C to terminate server")
-        print("=====================================================")
+    with socketserver.ThreadingTCPServer((HOST, PORT), SportsConnectHandler) as httpd:
+        logger.info("SportsConnect Platform Server running on %s:%s", HOST, PORT)
+        logger.info("Database backend: %s", "Supabase PostgreSQL" if USING_POSTGRES else "local SQLite")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\nServer shutting down.")
+            logger.info("Server shutting down.")
 
 if __name__ == "__main__":
-    run_server()
-, password):
-                    return self.send_json({"error": "Password must be at least 8 characters and include uppercase, lowercase, number and special character."}, 400)
-
-                # Check unique
-                cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
-                if cursor.fetchone():
-                    return self.send_json({"error": "Username or Email already registered."}, 409)
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO users (username, email, phone, password_hash, role, full_name, avatar, location, state, district, city, village, availability, bio, is_verified, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
-                """, (username, email, phone, hash_pw(password), role, full_name, '🏃' if role=='Player' else '👤', location, state, district, city, village, availability, 'SportsConnect Member', now))
-                user_id = cursor.lastrowid
-
-                # Create profile based on role
-                if role == 'Player':
-                    pos = body.get('position', 'Batsman')
-                    exp = float(body.get('experience_years', 1.0))
-                    age = body.get('age_group', 'Under-21')
-                    cursor.execute("""
-                    INSERT INTO player_profiles (user_id, sport, position, experience_years, age_group, preferred_role, availability, rating, classification, skill_score, performance_score, progress_pct, major_matches, verified_local_matches)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 8.0, 'Rising Talent', 82.0, 80.0, 16.0, 0, 1)
-                    """, (user_id, sport, pos, exp, age, pos, availability))
-                elif role == 'Coach':
-                    cursor.execute("""
-                    INSERT INTO coach_profiles (user_id, sport, experience_years, specialization, certifications, current_org, verification_status)
-                    VALUES (?, ?, 3.0, 'Head Coach', 'State Certified', 'Regional Club', 'pending')
-                    """, (user_id, sport))
-                elif role == 'Club':
-                    cursor.execute("""
-                    INSERT INTO club_profiles (user_id, sport, club_name, established_year, home_ground, division, verification_status)
-                    VALUES (?, ?, ?, 2020, 'Local Stadium', 'District League', 'pending')
-                    """, (user_id, sport, full_name))
-                elif role == 'Organizer':
-                    cursor.execute("""
-                    INSERT INTO organizer_profiles (user_id, organization_name, sport, registration_no, verification_status)
-                    VALUES (?, ?, ?, 'ORG-PENDING', 'pending')
-                    """, (user_id, full_name, sport))
-                elif role == 'Referee':
-                    cursor.execute("""
-                    INSERT INTO referee_profiles (user_id, sport, level, official_role, experience_years, certification, availability, verification_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-                    """, (user_id, sport, body.get('refereeing_level',''), body.get('position',''), float(body.get('experience_years') or 0), body.get('certification',''), availability))
-
-                # Preserve structured availability for coach/other profiles where the schema supports it
-                if role == 'Coach':
-                    cursor.execute("UPDATE coach_profiles SET current_org = ? WHERE user_id = ?", (body.get('current_team','') or None, user_id))
-
-                # Default privacy
-                cursor.execute("""
-                INSERT INTO privacy_settings (user_id, profile_visibility, contact_visibility, stats_visibility, certs_visibility, connections_visibility)
-                VALUES (?, 'public', 'connections_only', 'public', 'public', 'public')
-                """, (user_id,))
-
-                conn.commit()
-                # Return the complete newly-created user so the frontend can establish
-                # the real session immediately instead of falling back to demo Rahul.
-                cursor.execute("""
-                    SELECT id, username, email, phone, role, full_name, avatar, location,
-                           state, district, city, village, availability, bio, is_verified, status
-                    FROM users WHERE id = ?
-                """, (user_id,))
-                created_user = dict(cursor.fetchone())
-                if role == 'Player':
-                    cursor.execute("SELECT * FROM player_profiles WHERE user_id = ?", (user_id,))
-                    profile = cursor.fetchone()
-                    if profile:
-                        created_user.update({
-                            'sport': profile['sport'],
-                            'position': profile['position'],
-                            'skill_level': body.get('skill_level', ''),
-                            'rating': profile['rating'],
-                            'classification': profile['classification'],
-                            'skill_score': profile['skill_score'],
-                            'performance_score': profile['performance_score'],
-                            'progress_pct': profile['progress_pct'],
-                            'major_matches': profile['major_matches'],
-                            'verified_local_matches': profile['verified_local_matches']
-                        })
-                conn.commit()
-                return self.send_json({"success": True, "user_id": user_id, "user": created_user, "message": "Account created successfully."})
-
-            # 3. Smart Matching Engine
-            elif path == '/api/matching':
-                criteria = body # {sport, position, location, min_skill, availability}
-                req_sport = criteria.get('sport', 'Cricket')
-
-                cursor.execute("""
-                SELECT u.id, u.full_name, u.avatar, u.location,
-                       p.sport, p.position, p.classification, p.rating, p.skill_score, p.performance_score, p.progress_pct, p.availability
-                FROM users u
-                JOIN player_profiles p ON u.id = p.user_id
-                WHERE u.status = 'active' AND p.sport = ?
-                """, (req_sport,))
-                candidates = [dict(r) for r in cursor.fetchall()]
-
-                matched_results = []
-                for candidate in candidates:
-                    match_pct, reasons = smart_match(candidate, criteria)
-                    matched_results.append({
-                        "player": candidate,
-                        "match_pct": match_pct,
-                        "reasons": reasons
-                    })
-
-                matched_results.sort(key=lambda x: x['match_pct'], reverse=True)
-                return self.send_json({"matches": matched_results})
-
-            # 4. Upload / Submit Certificate
-            elif path == '/api/certificates':
-                player_id = body.get('player_id')
-                title = body.get('title')
-                issuing_org = body.get('issuing_org')
-                year = int(body.get('year', 2025))
-                achievement_text = body.get('achievement_text', '')
-                file_name = body.get('file_name', 'certificate_upload.pdf')
-
-                if not player_id or not title or not issuing_org:
-                    return self.send_json({"error": "Player, Title and Issuing Organization required"}, 400)
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO certificates (player_id, title, issuing_org, year, achievement_text, file_name, file_url, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-                """, (player_id, title, issuing_org, year, achievement_text, file_name, f"/certs/{file_name}", now))
-                cert_id = cursor.lastrowid
-
-                # Notify admin & user
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Verification', '🟡 Certificate Submitted', 'Your certificate has entered the verification queue.', '#certificates', ?)
-                """, (player_id, now))
-
-                conn.commit()
-                return self.send_json({"success": True, "certificate_id": cert_id, "status": "pending"})
-
-            # 5. Admin Certificate Verification (Verify / Reject)
-            elif path.startswith('/api/certificates/') and path.endswith('/verify'):
-                cert_id = int(path.split('/')[-2])
-                action = body.get('action') # 'verify' or 'reject'
-                reason = body.get('reason', '')
-                admin_name = body.get('admin_name', 'Chief Sports Verifier (Admin)')
-
-                status = 'verified' if action == 'verify' else 'rejected'
-                now = datetime.now().isoformat()
-
-                cursor.execute("""
-                UPDATE certificates 
-                SET status = ?, verified_by = ?, verified_at = ?, rejection_reason = ?
-                WHERE id = ?
-                """, (status, admin_name, now, reason if status == 'rejected' else None, cert_id))
-
-                # Fetch player to update classification and notify
-                cursor.execute("SELECT player_id, title FROM certificates WHERE id = ?", (cert_id,))
-                row = cursor.fetchone()
-                if row:
-                    p_id, c_title = row[0], row[1]
-                    notif_icon = '🟢' if status == 'verified' else '❌'
-                    notif_msg = f"Your certificate '{c_title}' has been verified!" if status == 'verified' else f"Your certificate '{c_title}' was rejected: {reason}"
-                    cursor.execute("""
-                    INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                    VALUES (?, 'Verification', ?, ?, '#certificates', ?)
-                    """, (p_id, f"{notif_icon} Certificate {status.capitalize()}", notif_msg, now))
-
-                    # Recalculate classification
-                    cursor.execute("""
-                    SELECT skill_score, performance_score, progress_pct, major_matches,
-                           (SELECT COUNT(*) FROM certificates WHERE player_id = ? AND status = 'verified')
-                    FROM player_profiles WHERE user_id = ?
-                    """, (p_id, p_id))
-                    p_info = cursor.fetchone()
-                    if p_info:
-                        new_cls, new_comp = calculate_player_classification(p_info[0], p_info[1], p_info[2], p_info[3], p_info[4])
-                        cursor.execute("UPDATE player_profiles SET classification = ? WHERE user_id = ?", (new_cls, p_id))
-
-                conn.commit()
-                return self.send_json({"success": True, "status": status})
-
-            # 6. Official Match Submission (By Organizer/Club)
-            elif path == '/api/matches':
-                organizer_name = body.get('organizer_name', 'Authorized Organizer')
-                sport = body.get('sport', 'Cricket')
-                title = body.get('title')
-                team_a = body.get('team_a')
-                team_b = body.get('team_b')
-                match_date = body.get('match_date', datetime.now().strftime('%Y-%m-%d'))
-                location = body.get('location', 'Stadium')
-                result_summary = body.get('result_summary', '')
-                score_a = body.get('score_a', '')
-                score_b = body.get('score_b', '')
-                players_stats = body.get('players_stats', []) # list of {player_id, team_name, role_played, stats_json, rating}
-
-                cursor.execute("""
-                INSERT INTO matches (sport, title, team_a, team_b, match_date, location, result_summary, score_a, score_b, status, verified_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?)
-                """, (sport, title, team_a, team_b, match_date, location, result_summary, score_a, score_b, organizer_name))
-                match_id = cursor.lastrowid
-
-                for ps in players_stats:
-                    p_id = ps['player_id']
-                    stats_json = json.dumps(ps.get('stats', {}))
-                    rating = float(ps.get('rating', 8.5))
-                    cursor.execute("""
-                    INSERT INTO match_player_stats (match_id, player_id, team_name, role_played, stats_json, performance_rating, verified_status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'verified')
-                    """, (match_id, p_id, ps['team_name'], ps['role_played'], stats_json, rating))
-
-                    # Update player verified local match count
-                    cursor.execute("""
-                    UPDATE player_profiles 
-                    SET verified_local_matches = verified_local_matches + 1,
-                        performance_score = ROUND((performance_score * 0.8) + (? * 0.2), 1)
-                    WHERE user_id = ?
-                    """, (rating * 10, p_id))
-
-                    # Notify player
-                    now = datetime.now().isoformat()
-                    cursor.execute("""
-                    INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                    VALUES (?, 'Matches', '🟢 Verified Match Added', ?, '#matches', ?)
-                    """, (p_id, f"Official match scorecard recorded: {title}. Stats verified by {organizer_name}.", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "match_id": match_id})
-
-            # 7. Post Trial & Trial Application
-            elif path == '/api/trials':
-                creator_id = body.get('creator_id')
-                sport = body.get('sport', 'Cricket')
-                position = body.get('position', 'Batsman')
-                title = body.get('title')
-                trial_date = body.get('trial_date')
-                trial_time = body.get('trial_time')
-                location = body.get('location')
-                requirements = body.get('requirements', '')
-                slots = int(body.get('slots', 10))
-
-                cursor.execute("""
-                INSERT INTO trials (creator_id, sport, position, title, trial_date, trial_time, location, requirements, slots, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open')
-                """, (creator_id, sport, position, title, trial_date, trial_time, location, requirements, slots))
-                trial_id = cursor.lastrowid
-                conn.commit()
-                return self.send_json({"success": True, "trial_id": trial_id})
-
-            elif path == '/api/trials/invite':
-                trial_id = body.get('trial_id')
-                player_id = body.get('player_id')
-                creator_id = body.get('creator_id')
-
-                cursor.execute("SELECT title, trial_date, location FROM trials WHERE id = ?", (trial_id,))
-                t = cursor.fetchone()
-                now = datetime.now().isoformat()
-
-                cursor.execute("""
-                INSERT INTO trial_applications (trial_id, player_id, status, created_at)
-                VALUES (?, ?, 'invited', ?)
-                """, (trial_id, player_id, now))
-
-                # Notify player
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Opportunities', '🏏 Trial Invitation', ?, '#trials', ?)
-                """, (player_id, f"You have been invited to trial: {t[0]} on {t[1]} at {t[2]}.", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "message": "Player invited for trial."})
-
-            elif path == '/api/trials/respond':
-                app_id = body.get('application_id')
-                trial_id = body.get('trial_id')
-                player_id = body.get('player_id')
-                response_status = body.get('status') # 'accepted' or 'declined'
-
-                if app_id:
-                    cursor.execute("UPDATE trial_applications SET status = ? WHERE id = ?", (response_status, app_id))
-                elif trial_id and player_id:
-                    cursor.execute("UPDATE trial_applications SET status = ? WHERE trial_id = ? AND player_id = ?", (response_status, trial_id, player_id))
-                conn.commit()
-                return self.send_json({"success": True, "status": response_status})
-
-            # 8. Connections & Messages
-            elif path == '/api/connections':
-                requester_id = body.get('requester_id')
-                recipient_id = body.get('recipient_id')
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO connections (requester_id, recipient_id, status, created_at)
-                VALUES (?, ?, 'pending', ?)
-                """, (requester_id, recipient_id, now))
-
-                # Notify recipient
-                cursor.execute("SELECT full_name FROM users WHERE id = ?", (requester_id,))
-                req_name = cursor.fetchone()[0]
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Connections', '🤝 Connection Request', ?, '#network', ?)
-                """, (recipient_id, f"{req_name} sent you a connection request.", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "message": "Connection request sent."})
-
-            elif path == '/api/connections/respond':
-                conn_id = body.get('connection_id')
-                status = body.get('status') # 'accepted' or 'declined'
-
-                cursor.execute("UPDATE connections SET status = ? WHERE id = ?", (status, conn_id))
-                conn.commit()
-                return self.send_json({"success": True, "status": status})
-
-            elif path == '/api/messages':
-                sender_id = body.get('sender_id')
-                recipient_id = body.get('recipient_id')
-                message_text = body.get('message_text')
-                msg_type = body.get('message_type', 'text')
-                metadata = body.get('metadata', None)
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO messages (sender_id, recipient_id, message_text, message_type, metadata_json, timestamp, is_read)
-                VALUES (?, ?, ?, ?, ?, ?, 0)
-                """, (sender_id, recipient_id, message_text, msg_type, json.dumps(metadata) if metadata else None, now))
-
-                # Notify
-                cursor.execute("SELECT full_name FROM users WHERE id = ?", (sender_id,))
-                s_name = cursor.fetchone()[0]
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Messages', '💬 New Message', ?, '#messages', ?)
-                """, (recipient_id, f"New message from {s_name}: {message_text[:40]}...", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "timestamp": now})
-
-            # 9. Bookmark / Save Talent
-            elif path == '/api/saved-talent':
-                user_id = body.get('user_id')
-                player_id = body.get('player_id')
-                notes = body.get('notes', 'Saved from talent search')
-                action = body.get('action', 'save') # 'save' or 'unsave'
-
-                if action == 'unsave':
-                    cursor.execute("DELETE FROM saved_talent WHERE user_id = ? AND player_id = ?", (user_id, player_id))
-                else:
-                    now = datetime.now().isoformat()
-                    cursor.execute("""
-                    INSERT OR REPLACE INTO saved_talent (user_id, player_id, notes, saved_at)
-                    VALUES (?, ?, ?, ?)
-                    """, (user_id, player_id, notes, now))
-
-                conn.commit()
-                return self.send_json({"success": True, "action": action})
-
-            # 10. Report System
-            elif path == '/api/reports':
-                reporter_id = body.get('reporter_id')
-                reported_user_id = body.get('reported_user_id')
-                item_type = body.get('reported_item_type', 'profile')
-                item_id = body.get('reported_item_id')
-                report_type = body.get('report_type', 'fake_profile')
-                description = body.get('description')
-                evidence = body.get('evidence_text', '')
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO reports (reporter_id, reported_user_id, reported_item_type, reported_item_id, report_type, description, evidence_text, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Under Review', ?)
-                """, (reporter_id, reported_user_id, item_type, item_id, report_type, description, evidence, now))
-                report_id = cursor.lastrowid
-
-                # Notify user of submission
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Reports', '🚨 Report Submitted (#{})', 'Your report is Under Review by the platform integrity team.', '#reports', ?)
-                """.format(report_id), (reporter_id, now))
-
-                conn.commit()
-                return self.send_json({"success": True, "report_id": report_id, "status": "Under Review"})
-
-            elif path.startswith('/api/admin/reports/') and path.endswith('/action'):
-                report_id = int(path.split('/')[-2])
-                action = body.get('action') # 'dismiss', 'more_info', 'escalate', 'resolve', 'suspend_user', 'reject_cert'
-                admin_notes = body.get('admin_notes', '')
-
-                status_map = {
-                    'dismiss': 'Dismissed',
-                    'more_info': 'More Information Needed',
-                    'escalate': 'Escalated',
-                    'resolve': 'Resolved',
-                    'suspend_user': 'Resolved',
-                    'reject_cert': 'Resolved'
-                }
-                new_status = status_map.get(action, 'Resolved')
-                now = datetime.now().isoformat()
-
-                cursor.execute("""
-                UPDATE reports 
-                SET status = ?, admin_notes = ?, resolved_at = ?
-                WHERE id = ?
-                """, (new_status, admin_notes, now, report_id))
-
-                if action == 'suspend_user':
-                    cursor.execute("SELECT reported_user_id FROM reports WHERE id = ?", (report_id,))
-                    u_id = cursor.fetchone()[0]
-                    cursor.execute("UPDATE users SET status = 'suspended' WHERE id = ?", (u_id,))
-
-                conn.commit()
-                return self.send_json({"success": True, "status": new_status})
-
-            # 11. Admin User Status (Suspend / Activate / Verify)
-            elif path.startswith('/api/admin/users/') and path.endswith('/status'):
-                user_id = int(path.split('/')[-2])
-                status = body.get('status', 'active')
-                is_verified = int(body.get('is_verified', 1))
-
-                cursor.execute("UPDATE users SET status = ?, is_verified = ? WHERE id = ?", (status, is_verified, user_id))
-                conn.commit()
-                return self.send_json({"success": True, "user_id": user_id, "status": status, "is_verified": is_verified})
-
-            else:
-                return self.send_json({"error": "Endpoint not found"}, 404)
-
-        finally:
-            conn.close()
-
-def run_server():
-    init_db(force=False)
-    # Lightweight migrations for existing databases.
-    conn = get_db(); c = conn.cursor()
-    for statement in [
-        "ALTER TABLE users ADD COLUMN city TEXT",
-        "ALTER TABLE users ADD COLUMN village TEXT",
-        "ALTER TABLE users ADD COLUMN availability TEXT",
-        "ALTER TABLE coach_profiles ADD COLUMN availability TEXT"
-    ]:
-        try: c.execute(statement)
-        except Exception: pass
-    conn.commit(); conn.close()
-
-    # Remove legacy/demo Admin records. The only Admin identity is the protected credential above.
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM users WHERE role = 'Admin' OR lower(username) IN ('admin', 'admin@sportsconnect.com')")
-        conn.commit()
-    finally:
-        conn.close()
-    socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", PORT), SportsConnectHandler) as httpd:
-        print("=====================================================")
-        print(f"SportsConnect Platform Server Running on http://localhost:{PORT}")
-        print(f"Database: {DB_PATH}")
-        print("Press Ctrl+C to terminate server")
-        print("=====================================================")
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\nServer shutting down.")
-
-if __name__ == "__main__":
-    run_server()
-, password):
-                    return self.send_json({"error": "Password must be at least 8 characters and include uppercase, lowercase, number and special character."}, 400)
-
-                # Check unique
+    run_server(), password):
+                    return self.send_json({"error": "Password must be at least 8 characters and include uppercase, lowercase, number, and special character."}, 400)
                 cursor.execute("SELECT id FROM users WHERE username = ? OR email = ? OR phone = ?", (username, email, phone))
                 if cursor.fetchone():
                     return self.send_json({"error": "Username, Email or Phone already registered."}, 409)
@@ -1788,7 +1417,8 @@ if __name__ == "__main__":
                             'verified_local_matches': profile['verified_local_matches']
                         })
                 conn.commit()
-                return self.send_json({"success": True, "user_id": user_id, "user": created_user, "message": "Account created successfully."})
+                session_token = issue_user_session(user_id)
+                return self.send_json({"success": True, "user_id": user_id, "user": created_user, "message": "Account created successfully."}, 200, [f'sc_session={urllib.parse.quote(session_token)}; Path=/; HttpOnly; SameSite=Lax{COOKIE_SECURE_FLAG}; Max-Age={SESSION_TTL_HOURS*3600}'])
 
             # 3. Smart Matching Engine
             elif path == '/api/matching':
@@ -1818,7 +1448,12 @@ if __name__ == "__main__":
 
             # 4. Upload / Submit Certificate
             elif path == '/api/certificates':
-                player_id = body.get('player_id')
+                player_id = int(body.get('player_id') or 0)
+                auth_id = current_user_id(self)
+                if not auth_id and not is_admin_request(self):
+                    return self.send_json({"error": "Authentication required."}, 401)
+                if not is_admin_request(self) and player_id != auth_id:
+                    return self.send_json({"error": "You may only manage your own certificates."}, 403)
                 title = body.get('title')
                 issuing_org = body.get('issuing_org')
                 year = int(body.get('year', 2025))
@@ -1888,7 +1523,13 @@ if __name__ == "__main__":
 
             # 6. Official Match Submission (By Organizer/Club)
             elif path == '/api/matches':
-                organizer_name = body.get('organizer_name', 'Authorized Organizer')
+                auth_id = current_user_id(self)
+                if not auth_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
+                auth_row = cursor.execute("SELECT role, full_name FROM users WHERE id = ?", (auth_id,)).fetchone()
+                if not auth_row or auth_row["role"] not in ("Organizer", "Club") and not is_admin_request(self):
+                    return self.send_json({"error": "Only organizers, clubs, or admins may submit official matches."}, 403)
+                organizer_name = auth_row["full_name"] if auth_row else "Authorized Organizer"
                 sport = body.get('sport', 'Cricket')
                 title = body.get('title')
                 team_a = body.get('team_a')
@@ -1919,7 +1560,7 @@ if __name__ == "__main__":
                     cursor.execute("""
                     UPDATE player_profiles 
                     SET verified_local_matches = verified_local_matches + 1,
-                        performance_score = ROUND((performance_score * 0.8) + (? * 0.2), 1)
+                        performance_score = ROUND(CAST((performance_score * 0.8) + (? * 0.2) AS numeric), 1)
                     WHERE user_id = ?
                     """, (rating * 10, p_id))
 
@@ -1935,7 +1576,12 @@ if __name__ == "__main__":
 
             # 7. Post Trial & Trial Application
             elif path == '/api/trials':
-                creator_id = body.get('creator_id')
+                creator_id = int(body.get('creator_id') or 0)
+                auth_id = current_user_id(self)
+                if not auth_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
+                if creator_id != auth_id:
+                    return self.send_json({"error": "You may only create trials for your own account."}, 403)
                 sport = body.get('sport', 'Cricket')
                 position = body.get('position', 'Batsman')
                 title = body.get('title')
@@ -1956,10 +1602,16 @@ if __name__ == "__main__":
             elif path == '/api/trials/invite':
                 trial_id = body.get('trial_id')
                 player_id = body.get('player_id')
-                creator_id = body.get('creator_id')
+                creator_id = current_user_id(self)
+                if not creator_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
 
-                cursor.execute("SELECT title, trial_date, location FROM trials WHERE id = ?", (trial_id,))
+                cursor.execute("SELECT title, trial_date, location, creator_id FROM trials WHERE id = ?", (trial_id,))
                 t = cursor.fetchone()
+                if not t:
+                    return self.send_json({"error": "Trial not found."}, 404)
+                if int(t["creator_id"]) != int(creator_id):
+                    return self.send_json({"error": "You may only invite players to your own trials."}, 403)
                 now = datetime.now().isoformat()
 
                 cursor.execute("""
@@ -1991,8 +1643,10 @@ if __name__ == "__main__":
 
             # 8. Connections & Messages
             elif path == '/api/connections':
-                requester_id = body.get('requester_id')
+                requester_id = current_user_id(self)
                 recipient_id = body.get('recipient_id')
+                if not requester_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
 
                 now = datetime.now().isoformat()
                 cursor.execute("""
@@ -2020,8 +1674,10 @@ if __name__ == "__main__":
                 return self.send_json({"success": True, "status": status})
 
             elif path == '/api/messages':
-                sender_id = body.get('sender_id')
+                sender_id = current_user_id(self)
                 recipient_id = body.get('recipient_id')
+                if not sender_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
                 message_text = body.get('message_text')
                 msg_type = body.get('message_type', 'text')
                 metadata = body.get('metadata', None)
@@ -2045,8 +1701,10 @@ if __name__ == "__main__":
 
             # 9. Bookmark / Save Talent
             elif path == '/api/saved-talent':
-                user_id = body.get('user_id')
+                user_id = current_user_id(self)
                 player_id = body.get('player_id')
+                if not user_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
                 notes = body.get('notes', 'Saved from talent search')
                 action = body.get('action', 'save') # 'save' or 'unsave'
 
@@ -2064,8 +1722,10 @@ if __name__ == "__main__":
 
             # 10. Report System
             elif path == '/api/reports':
-                reporter_id = body.get('reporter_id')
+                reporter_id = current_user_id(self)
                 reported_user_id = body.get('reported_user_id')
+                if not reporter_id:
+                    return self.send_json({"error": "Authentication required."}, 401)
                 item_type = body.get('reported_item_type', 'profile')
                 item_id = body.get('reported_item_id')
                 report_type = body.get('report_type', 'fake_profile')
@@ -2131,503 +1791,32 @@ if __name__ == "__main__":
             else:
                 return self.send_json({"error": "Endpoint not found"}, 404)
 
+        except Exception:
+            conn.rollback()
+            logger.exception("Unhandled POST API error: %s", path)
+            return self.send_json({"error": "Internal server error."}, 500)
         finally:
             conn.close()
 
 def run_server():
     init_db(force=False)
-    # Lightweight migrations for existing databases.
-    conn = get_db(); c = conn.cursor()
-    for statement in [
-        "ALTER TABLE users ADD COLUMN city TEXT",
-        "ALTER TABLE users ADD COLUMN village TEXT",
-        "ALTER TABLE users ADD COLUMN availability TEXT",
-        "ALTER TABLE coach_profiles ADD COLUMN availability TEXT"
-    ]:
-        try: c.execute(statement)
-        except Exception: pass
-    conn.commit(); conn.close()
 
-    # Remove legacy/demo Admin records. The only Admin identity is the protected credential above.
+    # Remove obsolete database Admin records. The real admin identity is environment-only.
     conn = get_db()
     try:
-        conn.execute("DELETE FROM users WHERE role = 'Admin' OR lower(username) IN ('admin', 'admin@sportsconnect.com')")
+        conn.cursor().execute("DELETE FROM users WHERE role = 'Admin' OR lower(username) IN ('admin', 'admin@sportsconnect.com')")
         conn.commit()
     finally:
         conn.close()
+
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", PORT), SportsConnectHandler) as httpd:
-        print("=====================================================")
-        print(f"SportsConnect Platform Server Running on http://localhost:{PORT}")
-        print(f"Database: {DB_PATH}")
-        print("Press Ctrl+C to terminate server")
-        print("=====================================================")
+    with socketserver.ThreadingTCPServer((HOST, PORT), SportsConnectHandler) as httpd:
+        logger.info("SportsConnect Platform Server running on %s:%s", HOST, PORT)
+        logger.info("Database backend: %s", "Supabase PostgreSQL" if USING_POSTGRES else "local SQLite")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\nServer shutting down.")
-
-if __name__ == "__main__":
-    run_server()
-, password):
-                    return self.send_json({"error": "Password must be at least 8 characters and include uppercase, lowercase, number and special character."}, 400)
-
-                # Check unique
-                cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
-                if cursor.fetchone():
-                    return self.send_json({"error": "Username or Email already registered."}, 409)
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO users (username, email, phone, password_hash, role, full_name, avatar, location, state, district, city, village, availability, bio, is_verified, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?)
-                """, (username, email, phone, hash_pw(password), role, full_name, '🏃' if role=='Player' else '👤', location, state, district, city, village, availability, 'SportsConnect Member', now))
-                user_id = cursor.lastrowid
-
-                # Create profile based on role
-                if role == 'Player':
-                    pos = body.get('position', 'Batsman')
-                    exp = float(body.get('experience_years', 1.0))
-                    age = body.get('age_group', 'Under-21')
-                    cursor.execute("""
-                    INSERT INTO player_profiles (user_id, sport, position, experience_years, age_group, preferred_role, availability, rating, classification, skill_score, performance_score, progress_pct, major_matches, verified_local_matches)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 8.0, 'Rising Talent', 82.0, 80.0, 16.0, 0, 1)
-                    """, (user_id, sport, pos, exp, age, pos, availability))
-                elif role == 'Coach':
-                    cursor.execute("""
-                    INSERT INTO coach_profiles (user_id, sport, experience_years, specialization, certifications, current_org, verification_status)
-                    VALUES (?, ?, 3.0, 'Head Coach', 'State Certified', 'Regional Club', 'pending')
-                    """, (user_id, sport))
-                elif role == 'Club':
-                    cursor.execute("""
-                    INSERT INTO club_profiles (user_id, sport, club_name, established_year, home_ground, division, verification_status)
-                    VALUES (?, ?, ?, 2020, 'Local Stadium', 'District League', 'pending')
-                    """, (user_id, sport, full_name))
-                elif role == 'Organizer':
-                    cursor.execute("""
-                    INSERT INTO organizer_profiles (user_id, organization_name, sport, registration_no, verification_status)
-                    VALUES (?, ?, ?, 'ORG-PENDING', 'pending')
-                    """, (user_id, full_name, sport))
-                elif role == 'Referee':
-                    cursor.execute("""
-                    INSERT INTO referee_profiles (user_id, sport, level, official_role, experience_years, certification, availability, verification_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-                    """, (user_id, sport, body.get('refereeing_level',''), body.get('position',''), float(body.get('experience_years') or 0), body.get('certification',''), availability))
-
-                # Preserve structured availability for coach/other profiles where the schema supports it
-                if role == 'Coach':
-                    cursor.execute("UPDATE coach_profiles SET current_org = ? WHERE user_id = ?", (body.get('current_team','') or None, user_id))
-
-                # Default privacy
-                cursor.execute("""
-                INSERT INTO privacy_settings (user_id, profile_visibility, contact_visibility, stats_visibility, certs_visibility, connections_visibility)
-                VALUES (?, 'public', 'connections_only', 'public', 'public', 'public')
-                """, (user_id,))
-
-                conn.commit()
-                # Return the complete newly-created user so the frontend can establish
-                # the real session immediately instead of falling back to demo Rahul.
-                cursor.execute("""
-                    SELECT id, username, email, phone, role, full_name, avatar, location,
-                           state, district, city, village, availability, bio, is_verified, status
-                    FROM users WHERE id = ?
-                """, (user_id,))
-                created_user = dict(cursor.fetchone())
-                if role == 'Player':
-                    cursor.execute("SELECT * FROM player_profiles WHERE user_id = ?", (user_id,))
-                    profile = cursor.fetchone()
-                    if profile:
-                        created_user.update({
-                            'sport': profile['sport'],
-                            'position': profile['position'],
-                            'skill_level': body.get('skill_level', ''),
-                            'rating': profile['rating'],
-                            'classification': profile['classification'],
-                            'skill_score': profile['skill_score'],
-                            'performance_score': profile['performance_score'],
-                            'progress_pct': profile['progress_pct'],
-                            'major_matches': profile['major_matches'],
-                            'verified_local_matches': profile['verified_local_matches']
-                        })
-                conn.commit()
-                return self.send_json({"success": True, "user_id": user_id, "user": created_user, "message": "Account created successfully."})
-
-            # 3. Smart Matching Engine
-            elif path == '/api/matching':
-                criteria = body # {sport, position, location, min_skill, availability}
-                req_sport = criteria.get('sport', 'Cricket')
-
-                cursor.execute("""
-                SELECT u.id, u.full_name, u.avatar, u.location,
-                       p.sport, p.position, p.classification, p.rating, p.skill_score, p.performance_score, p.progress_pct, p.availability
-                FROM users u
-                JOIN player_profiles p ON u.id = p.user_id
-                WHERE u.status = 'active' AND p.sport = ?
-                """, (req_sport,))
-                candidates = [dict(r) for r in cursor.fetchall()]
-
-                matched_results = []
-                for candidate in candidates:
-                    match_pct, reasons = smart_match(candidate, criteria)
-                    matched_results.append({
-                        "player": candidate,
-                        "match_pct": match_pct,
-                        "reasons": reasons
-                    })
-
-                matched_results.sort(key=lambda x: x['match_pct'], reverse=True)
-                return self.send_json({"matches": matched_results})
-
-            # 4. Upload / Submit Certificate
-            elif path == '/api/certificates':
-                player_id = body.get('player_id')
-                title = body.get('title')
-                issuing_org = body.get('issuing_org')
-                year = int(body.get('year', 2025))
-                achievement_text = body.get('achievement_text', '')
-                file_name = body.get('file_name', 'certificate_upload.pdf')
-
-                if not player_id or not title or not issuing_org:
-                    return self.send_json({"error": "Player, Title and Issuing Organization required"}, 400)
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO certificates (player_id, title, issuing_org, year, achievement_text, file_name, file_url, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-                """, (player_id, title, issuing_org, year, achievement_text, file_name, f"/certs/{file_name}", now))
-                cert_id = cursor.lastrowid
-
-                # Notify admin & user
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Verification', '🟡 Certificate Submitted', 'Your certificate has entered the verification queue.', '#certificates', ?)
-                """, (player_id, now))
-
-                conn.commit()
-                return self.send_json({"success": True, "certificate_id": cert_id, "status": "pending"})
-
-            # 5. Admin Certificate Verification (Verify / Reject)
-            elif path.startswith('/api/certificates/') and path.endswith('/verify'):
-                cert_id = int(path.split('/')[-2])
-                action = body.get('action') # 'verify' or 'reject'
-                reason = body.get('reason', '')
-                admin_name = body.get('admin_name', 'Chief Sports Verifier (Admin)')
-
-                status = 'verified' if action == 'verify' else 'rejected'
-                now = datetime.now().isoformat()
-
-                cursor.execute("""
-                UPDATE certificates 
-                SET status = ?, verified_by = ?, verified_at = ?, rejection_reason = ?
-                WHERE id = ?
-                """, (status, admin_name, now, reason if status == 'rejected' else None, cert_id))
-
-                # Fetch player to update classification and notify
-                cursor.execute("SELECT player_id, title FROM certificates WHERE id = ?", (cert_id,))
-                row = cursor.fetchone()
-                if row:
-                    p_id, c_title = row[0], row[1]
-                    notif_icon = '🟢' if status == 'verified' else '❌'
-                    notif_msg = f"Your certificate '{c_title}' has been verified!" if status == 'verified' else f"Your certificate '{c_title}' was rejected: {reason}"
-                    cursor.execute("""
-                    INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                    VALUES (?, 'Verification', ?, ?, '#certificates', ?)
-                    """, (p_id, f"{notif_icon} Certificate {status.capitalize()}", notif_msg, now))
-
-                    # Recalculate classification
-                    cursor.execute("""
-                    SELECT skill_score, performance_score, progress_pct, major_matches,
-                           (SELECT COUNT(*) FROM certificates WHERE player_id = ? AND status = 'verified')
-                    FROM player_profiles WHERE user_id = ?
-                    """, (p_id, p_id))
-                    p_info = cursor.fetchone()
-                    if p_info:
-                        new_cls, new_comp = calculate_player_classification(p_info[0], p_info[1], p_info[2], p_info[3], p_info[4])
-                        cursor.execute("UPDATE player_profiles SET classification = ? WHERE user_id = ?", (new_cls, p_id))
-
-                conn.commit()
-                return self.send_json({"success": True, "status": status})
-
-            # 6. Official Match Submission (By Organizer/Club)
-            elif path == '/api/matches':
-                organizer_name = body.get('organizer_name', 'Authorized Organizer')
-                sport = body.get('sport', 'Cricket')
-                title = body.get('title')
-                team_a = body.get('team_a')
-                team_b = body.get('team_b')
-                match_date = body.get('match_date', datetime.now().strftime('%Y-%m-%d'))
-                location = body.get('location', 'Stadium')
-                result_summary = body.get('result_summary', '')
-                score_a = body.get('score_a', '')
-                score_b = body.get('score_b', '')
-                players_stats = body.get('players_stats', []) # list of {player_id, team_name, role_played, stats_json, rating}
-
-                cursor.execute("""
-                INSERT INTO matches (sport, title, team_a, team_b, match_date, location, result_summary, score_a, score_b, status, verified_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?)
-                """, (sport, title, team_a, team_b, match_date, location, result_summary, score_a, score_b, organizer_name))
-                match_id = cursor.lastrowid
-
-                for ps in players_stats:
-                    p_id = ps['player_id']
-                    stats_json = json.dumps(ps.get('stats', {}))
-                    rating = float(ps.get('rating', 8.5))
-                    cursor.execute("""
-                    INSERT INTO match_player_stats (match_id, player_id, team_name, role_played, stats_json, performance_rating, verified_status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'verified')
-                    """, (match_id, p_id, ps['team_name'], ps['role_played'], stats_json, rating))
-
-                    # Update player verified local match count
-                    cursor.execute("""
-                    UPDATE player_profiles 
-                    SET verified_local_matches = verified_local_matches + 1,
-                        performance_score = ROUND((performance_score * 0.8) + (? * 0.2), 1)
-                    WHERE user_id = ?
-                    """, (rating * 10, p_id))
-
-                    # Notify player
-                    now = datetime.now().isoformat()
-                    cursor.execute("""
-                    INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                    VALUES (?, 'Matches', '🟢 Verified Match Added', ?, '#matches', ?)
-                    """, (p_id, f"Official match scorecard recorded: {title}. Stats verified by {organizer_name}.", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "match_id": match_id})
-
-            # 7. Post Trial & Trial Application
-            elif path == '/api/trials':
-                creator_id = body.get('creator_id')
-                sport = body.get('sport', 'Cricket')
-                position = body.get('position', 'Batsman')
-                title = body.get('title')
-                trial_date = body.get('trial_date')
-                trial_time = body.get('trial_time')
-                location = body.get('location')
-                requirements = body.get('requirements', '')
-                slots = int(body.get('slots', 10))
-
-                cursor.execute("""
-                INSERT INTO trials (creator_id, sport, position, title, trial_date, trial_time, location, requirements, slots, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open')
-                """, (creator_id, sport, position, title, trial_date, trial_time, location, requirements, slots))
-                trial_id = cursor.lastrowid
-                conn.commit()
-                return self.send_json({"success": True, "trial_id": trial_id})
-
-            elif path == '/api/trials/invite':
-                trial_id = body.get('trial_id')
-                player_id = body.get('player_id')
-                creator_id = body.get('creator_id')
-
-                cursor.execute("SELECT title, trial_date, location FROM trials WHERE id = ?", (trial_id,))
-                t = cursor.fetchone()
-                now = datetime.now().isoformat()
-
-                cursor.execute("""
-                INSERT INTO trial_applications (trial_id, player_id, status, created_at)
-                VALUES (?, ?, 'invited', ?)
-                """, (trial_id, player_id, now))
-
-                # Notify player
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Opportunities', '🏏 Trial Invitation', ?, '#trials', ?)
-                """, (player_id, f"You have been invited to trial: {t[0]} on {t[1]} at {t[2]}.", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "message": "Player invited for trial."})
-
-            elif path == '/api/trials/respond':
-                app_id = body.get('application_id')
-                trial_id = body.get('trial_id')
-                player_id = body.get('player_id')
-                response_status = body.get('status') # 'accepted' or 'declined'
-
-                if app_id:
-                    cursor.execute("UPDATE trial_applications SET status = ? WHERE id = ?", (response_status, app_id))
-                elif trial_id and player_id:
-                    cursor.execute("UPDATE trial_applications SET status = ? WHERE trial_id = ? AND player_id = ?", (response_status, trial_id, player_id))
-                conn.commit()
-                return self.send_json({"success": True, "status": response_status})
-
-            # 8. Connections & Messages
-            elif path == '/api/connections':
-                requester_id = body.get('requester_id')
-                recipient_id = body.get('recipient_id')
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO connections (requester_id, recipient_id, status, created_at)
-                VALUES (?, ?, 'pending', ?)
-                """, (requester_id, recipient_id, now))
-
-                # Notify recipient
-                cursor.execute("SELECT full_name FROM users WHERE id = ?", (requester_id,))
-                req_name = cursor.fetchone()[0]
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Connections', '🤝 Connection Request', ?, '#network', ?)
-                """, (recipient_id, f"{req_name} sent you a connection request.", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "message": "Connection request sent."})
-
-            elif path == '/api/connections/respond':
-                conn_id = body.get('connection_id')
-                status = body.get('status') # 'accepted' or 'declined'
-
-                cursor.execute("UPDATE connections SET status = ? WHERE id = ?", (status, conn_id))
-                conn.commit()
-                return self.send_json({"success": True, "status": status})
-
-            elif path == '/api/messages':
-                sender_id = body.get('sender_id')
-                recipient_id = body.get('recipient_id')
-                message_text = body.get('message_text')
-                msg_type = body.get('message_type', 'text')
-                metadata = body.get('metadata', None)
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO messages (sender_id, recipient_id, message_text, message_type, metadata_json, timestamp, is_read)
-                VALUES (?, ?, ?, ?, ?, ?, 0)
-                """, (sender_id, recipient_id, message_text, msg_type, json.dumps(metadata) if metadata else None, now))
-
-                # Notify
-                cursor.execute("SELECT full_name FROM users WHERE id = ?", (sender_id,))
-                s_name = cursor.fetchone()[0]
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Messages', '💬 New Message', ?, '#messages', ?)
-                """, (recipient_id, f"New message from {s_name}: {message_text[:40]}...", now))
-
-                conn.commit()
-                return self.send_json({"success": True, "timestamp": now})
-
-            # 9. Bookmark / Save Talent
-            elif path == '/api/saved-talent':
-                user_id = body.get('user_id')
-                player_id = body.get('player_id')
-                notes = body.get('notes', 'Saved from talent search')
-                action = body.get('action', 'save') # 'save' or 'unsave'
-
-                if action == 'unsave':
-                    cursor.execute("DELETE FROM saved_talent WHERE user_id = ? AND player_id = ?", (user_id, player_id))
-                else:
-                    now = datetime.now().isoformat()
-                    cursor.execute("""
-                    INSERT OR REPLACE INTO saved_talent (user_id, player_id, notes, saved_at)
-                    VALUES (?, ?, ?, ?)
-                    """, (user_id, player_id, notes, now))
-
-                conn.commit()
-                return self.send_json({"success": True, "action": action})
-
-            # 10. Report System
-            elif path == '/api/reports':
-                reporter_id = body.get('reporter_id')
-                reported_user_id = body.get('reported_user_id')
-                item_type = body.get('reported_item_type', 'profile')
-                item_id = body.get('reported_item_id')
-                report_type = body.get('report_type', 'fake_profile')
-                description = body.get('description')
-                evidence = body.get('evidence_text', '')
-
-                now = datetime.now().isoformat()
-                cursor.execute("""
-                INSERT INTO reports (reporter_id, reported_user_id, reported_item_type, reported_item_id, report_type, description, evidence_text, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'Under Review', ?)
-                """, (reporter_id, reported_user_id, item_type, item_id, report_type, description, evidence, now))
-                report_id = cursor.lastrowid
-
-                # Notify user of submission
-                cursor.execute("""
-                INSERT INTO notifications (user_id, category, title, message, link, timestamp)
-                VALUES (?, 'Reports', '🚨 Report Submitted (#{})', 'Your report is Under Review by the platform integrity team.', '#reports', ?)
-                """.format(report_id), (reporter_id, now))
-
-                conn.commit()
-                return self.send_json({"success": True, "report_id": report_id, "status": "Under Review"})
-
-            elif path.startswith('/api/admin/reports/') and path.endswith('/action'):
-                report_id = int(path.split('/')[-2])
-                action = body.get('action') # 'dismiss', 'more_info', 'escalate', 'resolve', 'suspend_user', 'reject_cert'
-                admin_notes = body.get('admin_notes', '')
-
-                status_map = {
-                    'dismiss': 'Dismissed',
-                    'more_info': 'More Information Needed',
-                    'escalate': 'Escalated',
-                    'resolve': 'Resolved',
-                    'suspend_user': 'Resolved',
-                    'reject_cert': 'Resolved'
-                }
-                new_status = status_map.get(action, 'Resolved')
-                now = datetime.now().isoformat()
-
-                cursor.execute("""
-                UPDATE reports 
-                SET status = ?, admin_notes = ?, resolved_at = ?
-                WHERE id = ?
-                """, (new_status, admin_notes, now, report_id))
-
-                if action == 'suspend_user':
-                    cursor.execute("SELECT reported_user_id FROM reports WHERE id = ?", (report_id,))
-                    u_id = cursor.fetchone()[0]
-                    cursor.execute("UPDATE users SET status = 'suspended' WHERE id = ?", (u_id,))
-
-                conn.commit()
-                return self.send_json({"success": True, "status": new_status})
-
-            # 11. Admin User Status (Suspend / Activate / Verify)
-            elif path.startswith('/api/admin/users/') and path.endswith('/status'):
-                user_id = int(path.split('/')[-2])
-                status = body.get('status', 'active')
-                is_verified = int(body.get('is_verified', 1))
-
-                cursor.execute("UPDATE users SET status = ?, is_verified = ? WHERE id = ?", (status, is_verified, user_id))
-                conn.commit()
-                return self.send_json({"success": True, "user_id": user_id, "status": status, "is_verified": is_verified})
-
-            else:
-                return self.send_json({"error": "Endpoint not found"}, 404)
-
-        finally:
-            conn.close()
-
-def run_server():
-    init_db(force=False)
-    # Lightweight migrations for existing databases.
-    conn = get_db(); c = conn.cursor()
-    for statement in [
-        "ALTER TABLE users ADD COLUMN city TEXT",
-        "ALTER TABLE users ADD COLUMN village TEXT",
-        "ALTER TABLE users ADD COLUMN availability TEXT",
-        "ALTER TABLE coach_profiles ADD COLUMN availability TEXT"
-    ]:
-        try: c.execute(statement)
-        except Exception: pass
-    conn.commit(); conn.close()
-
-    # Remove legacy/demo Admin records. The only Admin identity is the protected credential above.
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM users WHERE role = 'Admin' OR lower(username) IN ('admin', 'admin@sportsconnect.com')")
-        conn.commit()
-    finally:
-        conn.close()
-    socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", PORT), SportsConnectHandler) as httpd:
-        print("=====================================================")
-        print(f"SportsConnect Platform Server Running on http://localhost:{PORT}")
-        print(f"Database: {DB_PATH}")
-        print("Press Ctrl+C to terminate server")
-        print("=====================================================")
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\nServer shutting down.")
+            logger.info("Server shutting down.")
 
 if __name__ == "__main__":
     run_server()
