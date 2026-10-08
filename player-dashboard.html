@@ -838,7 +838,7 @@
       // exists. This prevents the dashboard from displaying the demo Rahul profile.
       if (current && current.id && current.role === 'Player' && typeof DataService !== 'undefined') {
         try {
-          const fresh = await DataService.getMe(current.id);
+          const fresh = await DataService.getMe();
           if (fresh && fresh.user) {
             current = { ...current, ...fresh.user, ...(fresh.user.player_profile || {}) };
             SessionManager.setUser(current);
