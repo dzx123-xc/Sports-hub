@@ -384,7 +384,7 @@ def init_db(force: bool = False):
         # Translate only SQLite-specific auto-increment declarations.
         postgres_schema = schema_sql.replace(
             "INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY"
-        )
+        ).replace("INTEGER", "BIGINT")
         cursor.execute(postgres_schema)
     else:
         cursor.executescript(schema_sql)
