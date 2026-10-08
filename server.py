@@ -667,7 +667,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 role = user['role']
                 role_fields = {
                     'Player': ('player_profiles', ['sport','position','experience_years','age_group','preferred_role','availability']),
-                    'Coach': ('coach_profiles', ['sport','experience_years','specialization','certifications','current_org','availability']),
+                    'Coach': ('coach_profiles', ['sport','experience_years','specialization','certifications','current_org']),
                     'Club': ('club_profiles', ['sport','club_name','established_year','home_ground','division']),
                     'Organizer': ('organizer_profiles', ['organization_name','sport','registration_no']),
                     'Referee': ('referee_profiles', ['sport','level','official_role','experience_years','certification','availability'])
