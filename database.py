@@ -431,8 +431,6 @@ def seed_demo_data(conn):
         (8, 'deccangladiator', 'info@deccangladiator.com', '+91 98765 33333', hash_pw('password123'), 'Club', 'Deccan Gladiators FC', '⚽', 'Hyderabad', 'Telangana', 'Gachibowli', 'Top-tier football club cultivating young youth talent through high-intensity tactical conditioning.', 1, 'active', now),
         # id=9: Telangana Youth Sports Council (Organizer)
         (9, 'tysports', 'tournaments@tysports.org', '+91 98765 44444', hash_pw('password123'), 'Organizer', 'Telangana Youth Sports Council', '🏆', 'Hyderabad', 'Telangana', 'Hyderabad', 'Apex organizing body for verified district tournaments, school championships, and talent evaluation leagues.', 1, 'active', now),
-        # id=10: SportsConnect Administrator
-        (10, 'admin', 'admin@sportsconnect.com', '+91 98765 99999', hash_pw('admin123'), 'Admin', 'Chief Sports Verifier (Admin)', '🛡️', 'Hyderabad', 'Telangana', 'Headquarters', 'Official integrity desk responsible for verifying certificates, official match scorecards, and platform compliance.', 1, 'active', now)
     ]
 
     cursor.executemany("""
