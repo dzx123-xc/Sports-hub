@@ -846,9 +846,13 @@
         } catch (e) { console.warn('Could not refresh player profile:', e); }
       }
 
-      // Prefer the authenticated user's real registration data. Demo data is used
-      // only when this page is intentionally opened without an authenticated session.
-      const user = current && current.role === 'Player' ? {
+      if (!current || current.role !== 'Player') {
+        window.location.replace('index.html');
+        return;
+      }
+
+      // Never substitute a demo identity for the authenticated player.
+      const user = {
         ...current,
         full_name: current.full_name || current.username || 'Player',
         username: current.username || '',
@@ -856,12 +860,15 @@
         location: current.location || [current.city, current.district, current.state].filter(Boolean).join(', '),
         bio: current.bio || 'SportsConnect player profile.',
         classification: current.classification || 'Player',
-        rating: Number(current.rating || 0), skill_score: Number(current.skill_score || 0),
-        progress_pct: Number(current.progress_pct || 0), major_matches: Number(current.major_matches || 0),
+        rating: Number(current.rating || 0),
+        skill_score: Number(current.skill_score || 0),
+        progress_pct: Number(current.progress_pct || 0),
+        major_matches: Number(current.major_matches || 0),
         verified_local_matches: Number(current.verified_local_matches || 0),
-        sport: current.sport || 'Multi-Sport', position: current.position || 'Player',
+        sport: current.sport || 'Multi-Sport',
+        position: current.position || 'Player',
         availability: current.availability || 'Not specified'
-      } : (DEMO_USERS['player' + pidNum] || DEMO_USERS.player1);
+      };
 
       // Update Header & Resume
       const nameTitle = document.getElementById('playerNameTitle');
