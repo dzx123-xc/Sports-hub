@@ -537,10 +537,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 8. Messages
             elif path == '/api/messages':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 other_id = qs.get('other_id', [None])[0]
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 if other_id:
                     cursor.execute("""
                     SELECT m.*, u.full_name as sender_name, u.avatar as sender_avatar
@@ -562,9 +562,9 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 9. Notifications
             elif path == '/api/notifications':
-                user_id = qs.get('user_id', [None])[0]
+                user_id = current_user_id(self)
                 if not user_id:
-                    return self.send_json({"error": "user_id required"}, 400)
+                    return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
                 SELECT * FROM notifications WHERE user_id = ? ORDER BY timestamp DESC LIMIT 30
                 """, (user_id,))
