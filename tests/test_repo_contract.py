@@ -29,5 +29,14 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("/api/auth/me", text)
         self.assertIn("/api/profile", text)
 
+    def test_protected_dashboards_load_security_scripts(self):
+        for page in [
+            "player-dashboard.html", "coach-dashboard.html", "club-dashboard.html",
+            "organizer-dashboard.html", "referee-dashboard.html"
+        ]:
+            text = (ROOT / page).read_text(encoding="utf-8")
+            self.assertIn('src="auth-guard.js"', text)
+            self.assertIn('src="identity-sync.js"', text)
+
 if __name__ == "__main__":
     unittest.main()
