@@ -301,6 +301,28 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         cursor = conn.cursor()
 
         try:
+            # Admin: show users with at least one unexpired authenticated session.
+            if path == '/api/admin/active-users':
+                now_iso = datetime.utcnow().isoformat()
+                cursor.execute("DELETE FROM sessions WHERE expires_at <= ?", (now_iso,))
+                conn.commit()
+                cursor.execute("""
+                SELECT u.id, u.username, u.full_name, u.email, u.phone, u.role,
+                       u.location, u.state, u.district, u.city, u.status,
+                       MAX(s.created_at) AS login_at,
+                       MAX(s.expires_at) AS session_expires_at,
+                       COUNT(s.id) AS active_sessions
+                FROM sessions s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.role = 'user' AND s.user_id IS NOT NULL
+                  AND s.expires_at > ? AND u.status = 'active'
+                GROUP BY u.id, u.username, u.full_name, u.email, u.phone, u.role,
+                         u.location, u.state, u.district, u.city, u.status
+                ORDER BY MAX(s.created_at) DESC
+                """, (now_iso,))
+                active_users = [dict(row) for row in cursor.fetchall()]
+                return self.send_json({"active_users": active_users, "count": len(active_users), "checked_at": now_iso})
+
             # 1. Auth Me - server session is authoritative.
             if path == '/api/auth/me':
                 user_id = current_user_id(self)

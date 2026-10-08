@@ -6,30 +6,32 @@
    ========================================================================== */
 
 :root {
-  --bg-primary: #080d1a;
-  --bg-surface: #0e172a;
-  --bg-surface-elevated: #15223c;
-  --bg-glass: rgba(14, 23, 42, 0.75);
-  --bg-glass-strong: rgba(10, 16, 32, 0.92);
+  --bg-primary: #050b18;
+  --bg-surface: #0b1630;
+  --bg-surface-elevated: #122348;
+  --bg-glass: rgba(11, 22, 48, 0.78);
+  --bg-glass-strong: rgba(5, 11, 24, 0.94);
   
-  --primary: #00e676;
-  --primary-glow: rgba(0, 230, 118, 0.35);
-  --primary-dark: #00b35c;
-  --cyan: #00d2ff;
-  --cyan-glow: rgba(0, 210, 255, 0.3);
-  --gold: #ffb800;
-  --gold-glow: rgba(255, 184, 0, 0.35);
-  --rose: #ff3366;
-  --amber: #ff9800;
+  --primary: #20e3b2;
+  --primary-glow: rgba(32, 227, 178, 0.38);
+  --primary-dark: #0eb98e;
+  --cyan: #38bdf8;
+  --cyan-glow: rgba(56, 189, 248, 0.34);
+  --gold: #fbbf24;
+  --gold-glow: rgba(251, 191, 36, 0.36);
+  --rose: #fb4f8a;
+  --amber: #fb923c;
+  --purple: #8b5cf6;
+  --purple-glow: rgba(139, 92, 246, 0.32);
   
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-medium: rgba(255, 255, 255, 0.15);
-  --border-focus: #00e676;
+  --border-focus: #20e3b2;
   
-  --text-primary: #ffffff;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-on-primary: #041208;
+  --text-primary: #f8fbff;
+  --text-secondary: #a9b9d1;
+  --text-muted: #7184a3;
+  --text-on-primary: #03130f;
   
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
@@ -89,8 +91,10 @@ body {
 .bg-overlay {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 20%, rgba(0, 230, 118, 0.08), transparent 70%),
-              linear-gradient(180deg, rgba(8, 13, 26, 0.6) 0%, rgba(8, 13, 26, 0.94) 75%, #080d1a 100%);
+  background: radial-gradient(circle at 18% 18%, rgba(56, 189, 248, 0.13), transparent 42%),
+              radial-gradient(circle at 82% 12%, rgba(139, 92, 246, 0.13), transparent 38%),
+              radial-gradient(circle at 50% 75%, rgba(32, 227, 178, 0.08), transparent 48%),
+              linear-gradient(180deg, rgba(5, 11, 24, 0.45) 0%, rgba(5, 11, 24, 0.86) 72%, #050b18 100%);
   z-index: -2;
 }
 @keyframes stadiumBreathe {
