@@ -1,16 +1,21 @@
+/* Normalize server identity for all protected dashboards. */
 (async function(){
-  const roleByPage={'player-dashboard.html':'Player','coach-dashboard.html':'Coach','club-dashboard.html':'Club','organizer-dashboard.html':'Organizer','referee-dashboard.html':'Referee','admin-portal.html':'Admin'};
-  const path=location.pathname.split('/').pop(); const role=roleByPage[path]; if(!role)return;
+  const page=location.pathname.split('/').pop();
+  const roles={'player-dashboard.html':'Player','coach-dashboard.html':'Coach','club-dashboard.html':'Club','organizer-dashboard.html':'Organizer','referee-dashboard.html':'Referee','admin-portal.html':'Admin'};
+  const expected=roles[page];
+  if(!expected)return;
   try{
-    const r=await fetch('/api/auth/me',{credentials:'same-origin'}); if(!r.ok)throw new Error();
-    const d=await r.json(); const u=d.user; if(!u||u.role!==role)throw new Error();
-    window.SPORTS_CONNECT_CURRENT_USER=u; localStorage.setItem('scUser',JSON.stringify(u));
-    const profile=u[role.toLowerCase()+'_profile']||{};
-    const sport=profile.sport||u.sport||''; const pos=profile.position||profile.specialization||profile.official_role||''; const loc=[u.location,u.state].filter(Boolean).join(', ');
-    const welcome=document.querySelector('.dash-welcome h2');
-    if(welcome){const badge=welcome.querySelector('.badge');welcome.textContent='';welcome.append(document.createTextNode((u.avatar||'🏆')+' '+u.full_name+' '));if(badge){badge.textContent=`🟢 ${role}`;welcome.append(badge);}}
-    const subtitle=document.querySelector('.dash-welcome p'); if(subtitle) subtitle.textContent=[sport,pos,loc].filter(Boolean).join(' • ');
-    const nameIds=['playerNameTitle','coachNameTitle','clubNameTitle','organizerNameTitle','refereeNameTitle']; nameIds.forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=u.full_name;});
-    const switcher=document.getElementById('athleteSwitcher'); if(switcher){const wrap=switcher.closest('div'); if(wrap)wrap.style.display='none';}
+    const res=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
+    if(!res.ok)throw new Error('unauthorized');
+    const {user}=await res.json();
+    if(!user||user.role!==expected)throw new Error('forbidden');
+    const profile=user[expected.toLowerCase()+'_profile']||{};
+    const merged={...user,...profile};
+    window.SPORTS_CONNECT_CURRENT_USER=merged;
+    localStorage.setItem('scUser',JSON.stringify(merged));
+    document.querySelectorAll('[data-current-user-name]').forEach(e=>e.textContent=user.full_name||'');
+    document.querySelectorAll('[data-current-user-email]').forEach(e=>e.textContent=user.email||'');
+    document.querySelectorAll('[data-current-user-role]').forEach(e=>e.textContent=user.role||'');
+    document.querySelectorAll('[data-current-user-location]').forEach(e=>e.textContent=[user.location,user.district,user.state].filter(Boolean).join(', '));
   }catch(e){location.replace('/');}
 })();
