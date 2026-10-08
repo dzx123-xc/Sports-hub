@@ -1,12 +1,11 @@
 """
 SportsConnect Full-Stack Server
 Provides RESTful APIs for the sports networking ecosystem and serves UI assets.
-Built with Python 3 standard library (http.server, sqlite3, json, hashlib).
+Built with Python 3 standard library plus PostgreSQL support via psycopg2.
 """
 
 import http.server
 import socketserver
-import sqlite3
 import json
 import urllib.parse
 import os
@@ -34,7 +33,7 @@ if not ADMIN_PASSWORD:
     logger.warning("ADMIN_PASSWORD is not configured; admin login is disabled.")
 
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true" if USING_POSTGRES else "false")
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true" if os.getenv("RAILWAY_ENVIRONMENT_NAME") else "false")
 COOKIE_SECURE_FLAG = "; Secure" if COOKIE_SECURE.lower() in ("1", "true", "yes") else ""
 
 PROTECTED_ROLE_PAGES = {
@@ -253,7 +252,14 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
 
         if path == '/health':
-            return self.send_json({"status": "ok", "database": "postgresql" if USING_POSTGRES else "sqlite"})
+            try:
+                health_conn = get_db()
+                health_conn.cursor().execute("SELECT 1").fetchone()
+                health_conn.close()
+                return self.send_json({"status": "ok", "database": "postgresql" if USING_POSTGRES else "sqlite"})
+            except Exception:
+                logger.exception("Health check failed")
+                return self.send_json({"status": "error"}, 503)
         
         if path.startswith('/api/'):
             if path.startswith('/api/admin/') and not is_admin_request(self):
