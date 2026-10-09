@@ -71,5 +71,12 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn('id="platformUsersBody"', admin)
         self.assertNotIn("SessionManager.switchDemoUser('player1')", admin)
 
-if __name__ == "__main__":
+
+    def test_landing_page_never_trusts_stale_browser_identity(self):
+        index = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('value="password123"', index)
+        self.assertIn("const endpoint = isAdmin ? '/api/admin/session' : '/api/auth/me';", index)
+        self.assertIn("credentials: 'same-origin'", index)
+        self.assertIn("localStorage.removeItem('sporthubUser');", index)
+\nif __name__ == "__main__":
     unittest.main()
