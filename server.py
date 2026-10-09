@@ -537,7 +537,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                         player_data['matches'].append(item)
                 else:
                     player_data['matches'] = []
-                return self.send_json({"player": player_data})            return self.send_json({"player": player_data})
+                return self.send_json({"player": player_data})
 
             # 4. Certificates
             elif path == '/api/certificates':
