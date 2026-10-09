@@ -72,6 +72,49 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["player"]["certificates"], [])
 
+    def test_connections_only_profile_is_visible_only_to_accepted_connections(self):
+        conn = database.get_db()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE privacy_settings SET profile_visibility = 'connections_only' WHERE user_id = ?",
+                (self.user_ids["Player"],),
+            )
+            cursor.execute(
+                "INSERT INTO connections (requester_id, recipient_id, status) VALUES (?, ?, 'accepted')",
+                (self.user_ids["Coach"], self.user_ids["Player"]),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        connected = self.client.get(
+            "/api/players/" + str(self.user_ids["Player"]),
+            cookies={"sc_session": self.tokens["Coach"]},
+        )
+        unconnected = self.client.get(
+            "/api/players/" + str(self.user_ids["Player"]),
+            cookies={"sc_session": self.tokens["Club"]},
+        )
+        self.assertEqual(connected.status_code, 200)
+        self.assertEqual(unconnected.status_code, 404)
+
+    def test_unknown_profile_visibility_fails_closed(self):
+        conn = database.get_db()
+        try:
+            conn.cursor().execute(
+                "UPDATE privacy_settings SET profile_visibility = 'unexpected-value' WHERE user_id = ?",
+                (self.user_ids["Player"],),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        response = self.client.get(
+            "/api/players/" + str(self.user_ids["Player"]),
+            cookies={"sc_session": self.tokens["Coach"]},
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_message_history_is_scoped_to_the_requested_conversation(self):
         response = self.client.get("/api/messages?other_id=" + str(self.user_ids["Coach"]), cookies={"sc_session": self.tokens["Player"]})
         self.assertEqual(response.status_code, 200)
