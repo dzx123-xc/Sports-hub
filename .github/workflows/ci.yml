@@ -1,4 +1,4 @@
-name: SConnect CI
+name: SportsHub CI
 
 on:
   push:
@@ -13,12 +13,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
       - name: Validate Python syntax
-        run: python -m compileall -q server.py database.py tests
-
+        run: python -m compileall -q server.py database.py app tests
       - name: Validate repository contract
         run: python -m unittest discover -s tests -v
-
       - name: Validate JavaScript syntax
         uses: actions/setup-node@v4
         with:
