@@ -277,12 +277,23 @@ const DataService = {
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reportData)
       });
-      if (res.ok) return await res.json();
-    } catch (e) {}
-    return { success: true, report_id: 1024, status: 'Under Review' };
+      let payload = {};
+      try { payload = await res.json(); } catch (e) {}
+      if (!res.ok) {
+        return {
+          success: false,
+          error: payload.error || payload.message || `Report submission failed (${res.status}).`
+        };
+      }
+      return { ...payload, success: payload.success !== false };
+    } catch (error) {
+      return { success: false, error: 'Unable to reach the server. Your report was not submitted.' };
+    }
   }
 };
 
@@ -677,8 +688,12 @@ const UIController = {
       evidence_text: ev
     });
 
+    if (!res || res.success === false || res.error) {
+      this.showToast(res?.error || 'Report could not be submitted. Please try again.', 'error');
+      return;
+    }
     this.closeModal('reportModal');
-    this.showToast(`Report #${res.report_id || '1024'} submitted. Status: 🟡 Under Review.`, 'success');
+    this.showToast(`Report #${res.report_id || '—'} submitted. Status: 🟡 Under Review.`, 'success');
   },
 
   openComparisonModal(p1 = DEMO_USERS.player1, p2 = DEMO_USERS.player2) {
