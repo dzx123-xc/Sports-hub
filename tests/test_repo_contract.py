@@ -80,6 +80,12 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("localStorage.removeItem('sporthubUser');", index)
 
 
+    def test_player_discovery_filters_private_profiles(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertIn("LEFT JOIN privacy_settings ps ON ps.user_id = u.id", server)
+        self.assertIn("COALESCE(ps.profile_visibility, 'public') = 'public'", server)
+        self.assertIn("c.status = 'accepted'", server)
+
     def test_certificate_verification_requires_admin_session(self):
         server = (ROOT / "server.py").read_text(encoding="utf-8")
         route = server.split("elif path.startswith('/api/certificates/') and path.endswith('/verify'):", 1)[1]

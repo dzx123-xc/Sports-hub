@@ -429,9 +429,27 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                        p.progress_pct, p.major_matches, p.verified_local_matches
                 FROM users u
                 JOIN player_profiles p ON u.id = p.user_id
+                LEFT JOIN privacy_settings ps ON ps.user_id = u.id
                 WHERE u.status = 'active'
                 """
                 params = []
+                viewer_id = current_user_id(self)
+                viewer_is_admin = is_admin_request(self)
+                if not viewer_is_admin:
+                    if viewer_id:
+                        query += """ AND (
+                            COALESCE(ps.profile_visibility, 'public') = 'public'
+                            OR u.id = ?
+                            OR (COALESCE(ps.profile_visibility, 'public') = 'connections_only' AND EXISTS (
+                                SELECT 1 FROM connections c
+                                WHERE c.status = 'accepted'
+                                  AND ((c.requester_id = ? AND c.recipient_id = u.id)
+                                    OR (c.requester_id = u.id AND c.recipient_id = ?))
+                            ))
+                        )"""
+                        params.extend([viewer_id, viewer_id, viewer_id])
+                    else:
+                        query += " AND COALESCE(ps.profile_visibility, 'public') = 'public'"
                 if sport and sport != 'All':
                     query += " AND p.sport = ?"
                     params.append(sport)
