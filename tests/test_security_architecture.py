@@ -31,6 +31,15 @@ class ArchitectureContractTests(unittest.TestCase):
         self.assertIn("app.include_router(health_router)", main)
         self.assertIn("def database_ready()", (root / "app/services/readiness.py").read_text(encoding="utf-8"))
 
+    def test_profile_and_certificate_privacy_are_enforced_in_legacy_api(self):
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        server = (root / "server.py").read_text(encoding="utf-8")
+        self.assertIn("Player profile is private.", server)
+        self.assertIn("Certificates are private.", server)
+        self.assertIn("privacy['stats_visibility']", server)
+        self.assertIn("COALESCE(ps.certs_visibility, 'public') = 'public'", server)
+
     def test_admin_totp_can_be_enforced_by_configuration(self):
         from pathlib import Path
         root = Path(__file__).resolve().parents[1]
