@@ -60,5 +60,16 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("credentials: 'same-origin'", app)
         self.assertIn("window.location.replace('index.html?logged_out=1');", app)
 
+
+    def test_admin_users_and_overview_are_loaded_from_authenticated_apis(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        admin = (ROOT / "admin-portal.html").read_text(encoding="utf-8")
+        self.assertIn("AS sport_or_org", server)
+        self.assertIn("path == '/api/admin/users'", server)
+        self.assertIn("fetch('/api/admin/users'", admin)
+        self.assertIn("fetch('/api/admin/stats'", admin)
+        self.assertIn('id="platformUsersBody"', admin)
+        self.assertNotIn("SessionManager.switchDemoUser('player1')", admin)
+
 if __name__ == "__main__":
     unittest.main()

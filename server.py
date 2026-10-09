@@ -640,10 +640,24 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             elif path == '/api/admin/users':
                 cursor.execute("""
-                    SELECT id, username, email, phone, role, full_name, avatar, location, state, district, status, is_verified, created_at
-                    FROM users
-                    WHERE role != 'Admin'
-                    ORDER BY id DESC
+                    SELECT u.id, u.username, u.email, u.phone, u.role, u.full_name, u.avatar,
+                           u.location, u.state, u.district, u.status, u.is_verified, u.created_at,
+                           COALESCE(
+                               (SELECT p.sport FROM player_profiles p WHERE p.user_id = u.id),
+                               (SELECT c.sport FROM coach_profiles c WHERE c.user_id = u.id),
+                               (SELECT cl.sport FROM club_profiles cl WHERE cl.user_id = u.id),
+                               (SELECT o.sport FROM organizer_profiles o WHERE o.user_id = u.id),
+                               (SELECT r.sport FROM referee_profiles r WHERE r.user_id = u.id),
+                               ''
+                           ) AS sport_or_org,
+                           COALESCE(
+                               (SELECT cl.club_name FROM club_profiles cl WHERE cl.user_id = u.id),
+                               (SELECT o.organization_name FROM organizer_profiles o WHERE o.user_id = u.id),
+                               ''
+                           ) AS organization_name
+                    FROM users u
+                    WHERE u.role != 'Admin'
+                    ORDER BY u.created_at DESC, u.id DESC
                 """)
                 return self.send_json({"users": [dict(r) for r in cursor.fetchall()]})
 

@@ -88,23 +88,23 @@
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-header"><span>Total Users</span><span>👥</span></div>
-          <div class="kpi-value" id="kpiTotalUsers">9</div>
-          <div class="kpi-subtitle">5 Players, 1 Coach, 2 Clubs, 1 Org</div>
+          <div class="kpi-value" id="kpiTotalUsers">—</div>
+          <div class="kpi-subtitle" id="kpiRoleBreakdown">Loading live account counts…</div>
         </div>
         <div class="kpi-card" style="border-left:4px solid var(--gold);">
           <div class="kpi-header"><span>Pending Certificates</span><span>📜</span></div>
-          <div class="kpi-value" style="color:var(--gold);" id="kpiPendingCerts">1</div>
+          <div class="kpi-value" style="color:var(--gold);" id="kpiPendingCerts">—</div>
           <div class="kpi-subtitle">Queued for verification audit</div>
         </div>
         <div class="kpi-card" style="border-left:4px solid var(--rose);">
           <div class="kpi-header"><span>Open Reports</span><span>🚨</span></div>
-          <div class="kpi-value" style="color:var(--rose);" id="kpiOpenReports">1</div>
-          <div class="kpi-subtitle">Report #1024 Under Review</div>
+          <div class="kpi-value" style="color:var(--rose);" id="kpiOpenReports">—</div>
+          <div class="kpi-subtitle">Live moderation queue</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-header"><span>Rising Talent</span><span>🌟</span></div>
-          <div class="kpi-value" style="color:var(--primary);" id="kpiRisingTalent">4</div>
-          <div class="kpi-subtitle">Algorithmic classifications</div>
+          <div class="kpi-value" style="color:var(--primary);" id="kpiRisingTalent">—</div>
+          <div class="kpi-subtitle">Live player classifications</div>
         </div>
       </div>
 
@@ -285,7 +285,7 @@
 
       <!-- 4. User Management -->
       <div class="resume-card" style="padding:28px;" id="secUsers">
-        <h3 style="font-size:18px; margin-bottom:14px;">👥 Platform Users & Entity Verification</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;"><h3 style="font-size:18px;margin:0;">👥 Platform Users & Entity Verification</h3><button class="btn btn-outline btn-sm" onclick="loadPlatformUsers()">🔄 Refresh Users</button></div><p id="platformUsersMeta" style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Loading registered accounts…</p>
 
         <div style="overflow-x:auto;">
           <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
@@ -296,43 +296,10 @@
                 <th style="padding:10px;">Sport / Org</th>
                 <th style="padding:10px;">Verification Status</th>
                 <th style="padding:10px;">Account Status</th>
-                <th style="padding:10px;">Action</th>
+                <th style="padding:10px;">Location</th>
               </tr>
             </thead>
-            <tbody>
-              <tr style="border-bottom:1px solid var(--border-subtle);">
-                <td style="padding:10px;">Rahul Kumar</td>
-                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Player</span></td>
-                <td style="padding:10px;">Cricket</td>
-                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified</span></td>
-                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
-                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('player1')">View Profile</button></td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border-subtle);">
-                <td style="padding:10px;">Vikram Rathore</td>
-                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Coach</span></td>
-                <td style="padding:10px;">Cricket &bull; BCCI Level 2</td>
-                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified Coach</span></td>
-                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
-                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('coach')">View Profile</button></td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border-subtle);">
-                <td style="padding:10px;">Hyderabad Warriors CC</td>
-                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Club</span></td>
-                <td style="padding:10px;">Cricket &bull; Div 1</td>
-                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified Club</span></td>
-                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
-                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('club')">View Profile</button></td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border-subtle);">
-                <td style="padding:10px;">Telangana Youth Sports Council</td>
-                <td style="padding:10px;"><span class="badge" style="background:rgba(255,255,255,0.08);">Organizer</span></td>
-                <td style="padding:10px;">Multi-Sport &bull; State Apex</td>
-                <td style="padding:10px;"><span class="badge badge-verified">🟢 Verified Organizer</span></td>
-                <td style="padding:10px;"><span style="color:var(--primary);">Active</span></td>
-                <td style="padding:10px;"><button class="btn btn-outline btn-sm" onclick="SessionManager.switchDemoUser('organizer')">View Profile</button></td>
-              </tr>
-            </tbody>
+            <tbody id="platformUsersBody"><tr><td colspan="6" style="padding:16px; color:var(--text-muted);">Loading registered users…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -361,7 +328,74 @@
         window.location.replace('index.html?logged_out=1');
       }
     }
-    document.addEventListener('DOMContentLoaded', loadActiveUsers);
+    document.addEventListener('DOMContentLoaded', () => {
+      loadActiveUsers();
+      loadPlatformUsers();
+      loadAdminOverview();
+    });
+
+    async function loadAdminOverview() {
+      try {
+        const response = await fetch('/api/admin/stats', { credentials: 'same-origin', cache: 'no-store' });
+        if (!response.ok) throw new Error('Admin statistics unavailable');
+        const { stats } = await response.json();
+        const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = String(value ?? 0); };
+        set('kpiTotalUsers', stats.total_users);
+        set('kpiPendingCerts', stats.pending_certificates);
+        set('kpiOpenReports', stats.open_reports);
+        set('kpiRisingTalent', stats.rising_talent_count);
+        set('kpiRoleBreakdown', `${stats.total_players ?? 0} Players · ${stats.total_coaches ?? 0} Coaches · ${stats.total_clubs ?? 0} Clubs · ${stats.total_organizers ?? 0} Organizers`);
+      } catch (error) {
+        ['kpiTotalUsers','kpiPendingCerts','kpiOpenReports','kpiRisingTalent'].forEach(id => {
+          const el = document.getElementById(id); if (el) el.textContent = '—';
+        });
+        const breakdown = document.getElementById('kpiRoleBreakdown');
+        if (breakdown) breakdown.textContent = 'Live statistics unavailable. Refresh to retry.';
+      }
+    }
+
+    async function loadPlatformUsers() {
+      const meta = document.getElementById('platformUsersMeta');
+      const body = document.getElementById('platformUsersBody');
+      if (!meta || !body) return;
+      meta.textContent = 'Loading registered accounts…';
+      body.innerHTML = '<tr><td colspan="6" style="padding:16px;color:var(--text-muted);">Loading…</td></tr>';
+      try {
+        const response = await fetch('/api/admin/users', { credentials: 'same-origin', cache: 'no-store' });
+        if (!response.ok) throw new Error('Unable to load registered users');
+        const payload = await response.json();
+        const users = Array.isArray(payload.users) ? payload.users : [];
+        meta.textContent = `${users.length} registered account(s) • Updated ${new Date().toLocaleTimeString()}`;
+        if (!users.length) {
+          body.innerHTML = '<tr><td colspan="6" style="padding:16px;color:var(--text-muted);">No registered users yet.</td></tr>';
+          return;
+        }
+        body.innerHTML = users.map(user => {
+          const name = escapeHtml(user.full_name || user.username || 'Unnamed user');
+          const role = escapeHtml(user.role || 'Unknown');
+          const sport = escapeHtml(user.organization_name || user.sport_or_org || '—');
+          const verification = Number(user.is_verified) === 1
+            ? '<span class="badge badge-verified">Verified</span>'
+            : '<span class="badge">Unverified</span>';
+          const active = user.status === 'active';
+          const status = active
+            ? '<span style="color:var(--primary);">Active</span>'
+            : '<span style="color:var(--rose);">Suspended</span>';
+          const location = escapeHtml([user.city, user.district, user.state, user.location].filter(Boolean).join(', ') || '—');
+          return '<tr style="border-bottom:1px solid var(--border-subtle);">' +
+            '<td style="padding:10px;"><b>' + name + '</b><div style="font-size:11px;color:var(--text-muted);">@' + escapeHtml(user.username || '') + '</div></td>' +
+            '<td style="padding:10px;"><span class="badge">' + role + '</span></td>' +
+            '<td style="padding:10px;">' + sport + '</td>' +
+            '<td style="padding:10px;">' + verification + '</td>' +
+            '<td style="padding:10px;">' + status + '</td>' +
+            '<td style="padding:10px;">' + location + '</td>' +
+          '</tr>';
+        }).join('');
+      } catch (error) {
+        meta.textContent = 'Could not load registered accounts.';
+        body.innerHTML = '<tr><td colspan="6" style="padding:16px;color:var(--rose);">User data unavailable. Check your admin session and refresh.</td></tr>';
+      }
+    }
   </script>
   <script>
     async function loadActiveUsers() {
