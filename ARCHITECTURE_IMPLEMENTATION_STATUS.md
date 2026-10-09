@@ -37,10 +37,10 @@ If the secret is not set and the required flag is false, legacy admin login rema
 ## Not yet complete; do not represent as production-ready
 
 - Full migration of all legacy REST endpoints into FastAPI routers.
-- Complete service/repository separation for existing feature logic.
+- Complete service/repository separation for all existing feature logic; direct SQL remains in the player and certificate routers, while messaging now uses dedicated service/repository layers.
 - End-to-end integration coverage for every role and every authorization branch.
-- Upload endpoints and per-object ownership checks wired to the private storage adapter.
-- Production worker service provisioning, dead-letter/replay operations, and queue concurrency hardening.
+- UI integration for media uploads, object metadata lifecycle, malware/content scanning, and per-user storage quota enforcement.
+- Production worker service provisioning, dead-letter/replay operations, queue lease recovery/concurrency hardening, and notification/scoring enqueue integration for every legacy mutation path.
 - Automated production backup verification and external error/uptime alert delivery.
 
 ## Safe release sequence
