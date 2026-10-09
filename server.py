@@ -13,7 +13,7 @@ import mimetypes
 import secrets
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import DB_PATH, get_db, hash_pw, verify_pw, init_db, USING_POSTGRES
 
 logging.basicConfig(
@@ -25,6 +25,16 @@ logger = logging.getLogger("sportsconnect")
 PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _utcnow_naive():
+    """Return UTC now as naive ISO-compatible time for existing DB timestamps.
+
+    Session timestamps have historically been stored as naive UTC ISO strings.
+    Build the instant with an aware UTC datetime, then remove tzinfo only at the
+    storage boundary to keep comparisons compatible with existing rows.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # Admin credentials are deployment secrets, never source-code credentials.
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin_123")
@@ -59,14 +69,14 @@ def current_user_id(handler):
     if not token: return None
     conn = get_db()
     try:
-        row = conn.cursor().execute("SELECT user_id FROM sessions WHERE token_hash = ? AND role = 'user' AND expires_at > ?", (_token_hash(token), datetime.utcnow().isoformat())).fetchone()
+        row = conn.cursor().execute("SELECT user_id FROM sessions WHERE token_hash = ? AND role = 'user' AND expires_at > ?", (_token_hash(token), _utcnow_naive().isoformat())).fetchone()
         return int(row["user_id"]) if row and row["user_id"] is not None else None
     finally:
         conn.close()
 
 def issue_user_session(user_id):
     token = secrets.token_urlsafe(32)
-    now = datetime.utcnow()
+    now = _utcnow_naive()
     expires = now + timedelta(hours=SESSION_TTL_HOURS)
     conn = get_db()
     try:
@@ -78,7 +88,7 @@ def issue_user_session(user_id):
 
 def issue_admin_session():
     token = secrets.token_urlsafe(32)
-    now = datetime.utcnow()
+    now = _utcnow_naive()
     expires = now + timedelta(hours=SESSION_TTL_HOURS)
     conn = get_db()
     try:
@@ -103,7 +113,7 @@ def is_admin_request(handler):
     if not token: return False
     conn = get_db()
     try:
-        row = conn.cursor().execute("SELECT 1 FROM sessions WHERE token_hash = ? AND role = 'admin' AND expires_at > ?", (_token_hash(token), datetime.utcnow().isoformat())).fetchone()
+        row = conn.cursor().execute("SELECT 1 FROM sessions WHERE token_hash = ? AND role = 'admin' AND expires_at > ?", (_token_hash(token), _utcnow_naive().isoformat())).fetchone()
         return bool(row)
     finally:
         conn.close()
@@ -303,7 +313,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         try:
             # Admin: show users with at least one unexpired authenticated session.
             if path == '/api/admin/active-users':
-                now_iso = datetime.utcnow().isoformat()
+                now_iso = _utcnow_naive().isoformat()
                 cursor.execute("DELETE FROM sessions WHERE expires_at <= ?", (now_iso,))
                 conn.commit()
                 cursor.execute("""
