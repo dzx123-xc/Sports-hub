@@ -2,7 +2,19 @@ import unittest
 from unittest.mock import patch
 
 from app.security.totp import verify_totp
+from app.security.privacy import can_view_visibility
 from app.storage.supabase_private import StorageNotConfigured, SupabasePrivateStorage
+
+
+class PrivacyPolicyTests(unittest.TestCase):
+    def test_visibility_matrix_for_public_connection_private_and_admin(self):
+        self.assertTrue(can_view_visibility("public", is_admin=False, is_owner=False, is_connected=False))
+        self.assertTrue(can_view_visibility("connections_only", is_admin=False, is_owner=False, is_connected=True))
+        self.assertFalse(can_view_visibility("connections_only", is_admin=False, is_owner=False, is_connected=False))
+        self.assertFalse(can_view_visibility("private", is_admin=False, is_owner=False, is_connected=True))
+        self.assertTrue(can_view_visibility("private", is_admin=False, is_owner=True, is_connected=False))
+        self.assertTrue(can_view_visibility("private", is_admin=True, is_owner=False, is_connected=False))
+        self.assertFalse(can_view_visibility("unknown-value", is_admin=False, is_owner=False, is_connected=True))
 
 
 class TotpTests(unittest.TestCase):
