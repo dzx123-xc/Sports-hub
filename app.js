@@ -249,9 +249,10 @@ const DataService = {
     };
   },
 
-  async login(identifier, password) {
+  async login(identifier, password, totpCode = '') {
     identifier = String(identifier || '').trim();
     password = String(password || '');
+    totpCode = String(totpCode || '').trim();
     try {
       // Email-first account discovery: an existing system email proceeds to login;
       // an unknown email is directed to account creation.
@@ -265,7 +266,7 @@ const DataService = {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, password })
+        body: JSON.stringify({ identifier, password, ...(totpCode ? { totp_code: totpCode } : {}) })
       });
       return await res.json();
     } catch (e) {
