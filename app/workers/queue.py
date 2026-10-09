@@ -22,9 +22,9 @@ def enqueue(job_type: str, payload: dict[str, Any]) -> int:
             "INSERT INTO background_jobs (job_type, payload_json, status, attempts, created_at, updated_at) VALUES (?, ?, 'pending', 0, ?, ?)",
             (job_type, json.dumps(payload, separators=(",", ":")), now, now),
         )
-        row = cursor.execute("SELECT MAX(id) AS id FROM background_jobs").fetchone()
+        job_id = cursor.lastrowid
         conn.commit()
-        return int(row["id"])
+        return int(job_id)
 
 
 def claim_one() -> dict[str, Any] | None:
