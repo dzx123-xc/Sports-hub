@@ -13,6 +13,9 @@ import mimetypes
 import secrets
 import hashlib
 import logging
+import threading
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from database import DB_PATH, get_db, hash_pw, verify_pw, init_db, USING_POSTGRES
 
@@ -45,6 +48,25 @@ if not ADMIN_PASSWORD:
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true" if os.getenv("RAILWAY_ENVIRONMENT_NAME") else "false")
 COOKIE_SECURE_FLAG = "; Secure" if COOKIE_SECURE.lower() in ("1", "true", "yes") else ""
+
+_RATE_LIMITS = defaultdict(deque)
+_RATE_LIMIT_LOCK = threading.Lock()
+
+def _client_ip(handler):
+    # Trust the direct peer by default; do not trust user-supplied forwarded headers.
+    return handler.client_address[0] if handler.client_address else "unknown"
+
+def _rate_limit_allowed(handler, bucket, limit, window_seconds):
+    now = time.monotonic()
+    key = (bucket, _client_ip(handler))
+    with _RATE_LIMIT_LOCK:
+        events = _RATE_LIMITS[key]
+        while events and now - events[0] >= window_seconds:
+            events.popleft()
+        if len(events) >= limit:
+            return False
+        events.append(now)
+        return True
 
 PROTECTED_ROLE_PAGES = {
     '/player-dashboard.html': 'Player',
@@ -297,6 +319,19 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
+
+        # Reject cross-origin browser mutations. SameSite cookies remain an additional layer.
+        origin = self.headers.get('Origin')
+        if origin:
+            origin_parts = urllib.parse.urlparse(origin)
+            if not origin_parts.netloc or origin_parts.netloc.lower() != self.headers.get('Host', '').lower():
+                return self.send_json({'error': 'Cross-origin request blocked.'}, 403)
+
+        # Lightweight per-process abuse throttling for sensitive public endpoints.
+        if path == '/api/auth/login' and not _rate_limit_allowed(self, 'login', 10, 600):
+            return self.send_json({'error': 'Too many login attempts. Try again in 10 minutes.'}, 429)
+        if path == '/api/auth/register' and not _rate_limit_allowed(self, 'register', 5, 600):
+            return self.send_json({'error': 'Too many registration attempts. Try again later.'}, 429)
 
         if path.startswith('/api/'):
             if path.startswith('/api/admin/') and not is_admin_request(self):
