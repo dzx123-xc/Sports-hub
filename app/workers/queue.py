@@ -6,7 +6,7 @@ operational worker process are configured in each environment.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.repositories.database import connection
@@ -27,14 +27,31 @@ def enqueue(job_type: str, payload: dict[str, Any]) -> int:
         return int(job_id)
 
 
-def claim_one() -> dict[str, Any] | None:
-    """Claim one pending job; SQLite deployments should run a single worker."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+def claim_one(*, lease_seconds: int = 300, max_attempts: int = 5) -> dict[str, Any] | None:
+    """Claim one pending job and recover jobs abandoned by a crashed worker.
+
+    Expired processing jobs are retried unless they have exhausted the retry budget.
+    SQLite deployments should still run a single worker.
+    """
+    if lease_seconds < 1:
+        raise ValueError("lease_seconds must be positive")
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = now_dt.isoformat()
+    stale_before = (now_dt - timedelta(seconds=lease_seconds)).isoformat()
     with connection() as conn:
         cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE background_jobs
+               SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END,
+                   error_text = CASE WHEN attempts >= ? THEN 'Worker lease expired after retry budget was exhausted' ELSE error_text END,
+                   updated_at = ?
+               WHERE status = 'processing' AND updated_at < ?""",
+            (max_attempts, max_attempts, now, stale_before),
+        )
         cursor.execute("SELECT * FROM background_jobs WHERE status = 'pending' ORDER BY id LIMIT 1")
         row = cursor.fetchone()
         if not row:
+            conn.commit()
             return None
         job = dict(row)
         cursor.execute("UPDATE background_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'pending'", (now, job["id"]))
@@ -45,7 +62,6 @@ def claim_one() -> dict[str, Any] | None:
         job["payload"] = json.loads(job.pop("payload_json"))
         job["attempts"] = int(job.get("attempts") or 0) + 1
         return job
-
 
 def finish(job_id: int) -> None:
     now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
