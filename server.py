@@ -868,8 +868,10 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             # 3. Register
             elif path == '/api/auth/register':
                 role = body.get('role', 'Player')
+                if role not in ('Player', 'Coach', 'Club', 'Organizer', 'Referee'):
+                    return self.send_json({'error': 'Invalid account role.'}, 400)
                 username = body.get('username', '').strip().lower()
-                if role == 'Admin' or username == ADMIN_USERNAME.lower() or username == 'admin':
+                if username == ADMIN_USERNAME.lower() or username == 'admin':
                     return self.send_json({'error': 'Admin accounts cannot be created through public registration.'}, 403)
                 email = body.get('email', '').strip().lower()
                 phone = body.get('phone', '').strip()
@@ -1034,10 +1036,16 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 5. Admin Certificate Verification (Verify / Reject)
             elif path.startswith('/api/certificates/') and path.endswith('/verify'):
+                if not is_admin_request(self):
+                    return self.send_json({'error': 'Admin authorization required.'}, 403)
                 cert_id = int(path.split('/')[-2])
                 action = body.get('action') # 'verify' or 'reject'
                 reason = body.get('reason', '')
-                admin_name = body.get('admin_name', 'Chief Sports Verifier (Admin)')
+                admin_name = 'Platform Admin'
+                if action not in ('verify', 'reject'):
+                    return self.send_json({'error': "Action must be 'verify' or 'reject'."}, 400)
+                if action == 'reject' and not str(reason).strip():
+                    return self.send_json({'error': 'A rejection reason is required.'}, 400)
 
                 status = 'verified' if action == 'verify' else 'rejected'
                 now = datetime.now().isoformat()
@@ -1271,9 +1279,22 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 recipient_id = body.get('recipient_id')
                 if not sender_id:
                     return self.send_json({"error": "Authentication required."}, 401)
-                message_text = body.get('message_text')
+                try:
+                    recipient_id = int(recipient_id)
+                except (TypeError, ValueError):
+                    return self.send_json({"error": "A valid recipient_id is required."}, 400)
+                if recipient_id == int(sender_id):
+                    return self.send_json({"error": "You cannot message your own account."}, 400)
+                recipient = cursor.execute("SELECT id, status FROM users WHERE id = ?", (recipient_id,)).fetchone()
+                if not recipient or recipient['status'] != 'active':
+                    return self.send_json({"error": "Recipient account not found or inactive."}, 404)
+                message_text = str(body.get('message_text') or '').strip()
                 msg_type = body.get('message_type', 'text')
                 metadata = body.get('metadata', None)
+                if not message_text or len(message_text) > 5000:
+                    return self.send_json({"error": "Message must contain 1–5000 characters."}, 400)
+                if msg_type not in ('text', 'trial_invite', 'tournament_invite'):
+                    return self.send_json({"error": "Invalid message type."}, 400)
 
                 now = datetime.now().isoformat()
                 cursor.execute("""
@@ -1319,11 +1340,26 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 reported_user_id = body.get('reported_user_id')
                 if not reporter_id:
                     return self.send_json({"error": "Authentication required."}, 401)
+                try:
+                    reported_user_id = int(reported_user_id)
+                except (TypeError, ValueError):
+                    return self.send_json({"error": "A valid reported_user_id is required."}, 400)
+                if reported_user_id == int(reporter_id):
+                    return self.send_json({"error": "You cannot report your own account."}, 400)
+                target = cursor.execute("SELECT id FROM users WHERE id = ?", (reported_user_id,)).fetchone()
+                if not target:
+                    return self.send_json({"error": "Reported account not found."}, 404)
                 item_type = body.get('reported_item_type', 'profile')
                 item_id = body.get('reported_item_id')
                 report_type = body.get('report_type', 'fake_profile')
-                description = body.get('description')
-                evidence = body.get('evidence_text', '')
+                description = str(body.get('description') or '').strip()
+                evidence = str(body.get('evidence_text') or '').strip()
+                if not description or len(description) > 5000:
+                    return self.send_json({"error": "Report description must contain 1–5000 characters."}, 400)
+                if item_type not in ('profile', 'certificate', 'match_stats', 'behavior'):
+                    return self.send_json({"error": "Invalid reported item type."}, 400)
+                if report_type not in ('fake_profile', 'fake_certificate', 'incorrect_stats', 'impersonation', 'spam', 'other'):
+                    return self.send_json({"error": "Invalid report type."}, 400)
 
                 now = datetime.now().isoformat()
                 cursor.execute("""
