@@ -1,0 +1,30 @@
+name: SportsHub Staging Validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require configured staging URL
+        env:
+          STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+        run: |
+          if [ -z "$STAGING_BASE_URL" ]; then
+            echo "::error::Set the STAGING_BASE_URL repository variable to the staging deployment URL."
+            exit 1
+          fi
+          echo "STAGING_BASE_URL=$STAGING_BASE_URL" >> "$GITHUB_ENV"
+      - name: Check staging liveness
+        run: curl --fail --silent --show-error --max-time 20 "$STAGING_BASE_URL/health"
+      - name: Check staging database readiness
+        run: curl --fail --silent --show-error --max-time 20 "$STAGING_BASE_URL/health/ready"
+      - name: Check auth route responds
+        run: |
+          code=$(curl --silent --output /tmp/login-response.json --write-out '%{http_code}' --max-time 20 \
+            -H 'Content-Type: application/json' -d '{}' "$STAGING_BASE_URL/api/auth/login")
+          test "$code" = "400" || { cat /tmp/login-response.json; echo "Expected validation HTTP 400, got $code"; exit 1; }
