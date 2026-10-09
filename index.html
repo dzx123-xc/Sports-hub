@@ -100,11 +100,11 @@
         <div id="landingLoginView">
           <div class="form-group">
             <label class="form-label">Email, Mobile, or Username</label>
-            <input id="loginIdent" class="form-input" placeholder="e.g. rahul@sportsconnect.com" value="rahul@sportsconnect.com">
+            <input id="loginIdent" class="form-input" placeholder="Email, username, or phone" autocomplete="username">
           </div>
           <div class="form-group">
             <label class="form-label">Password</label>
-            <input id="loginPass" type="password" class="form-input" placeholder="••••••••" value="password123">
+            <input id="loginPass" type="password" class="form-input" placeholder="Enter your password" autocomplete="current-password">
           </div>
 
           <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="handleLandingLogin()">
@@ -529,9 +529,41 @@
       document.getElementById('indexModuleText').textContent=`${title} is opened from the ${role} workspace. This single-page shell is ready to connect each module to the backend APIs without changing the account identity or leaving index.html.`;
     }
     function escapeIndex(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-    document.addEventListener('DOMContentLoaded',()=>{
-      const u=SessionManager.getUser&&SessionManager.getUser();
-      if(u) showIndexDashboard(u);
+    document.addEventListener('DOMContentLoaded', async () => {
+      const cachedUser = SessionManager.getUser && SessionManager.getUser();
+      if (!cachedUser) return;
+
+      const isAdmin = cachedUser.role === 'Admin';
+      const endpoint = isAdmin ? '/api/admin/session' : '/api/auth/me';
+      try {
+        const response = await fetch(endpoint, {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('Session is no longer valid');
+        const payload = await response.json();
+        if (isAdmin) {
+          if (!payload.user || payload.user.role !== 'Admin') throw new Error('Invalid admin session');
+          window.location.replace('admin-portal.html');
+          return;
+        }
+        const user = payload.user;
+        if (!user || user.status === 'suspended') throw new Error('Invalid user session');
+        SessionManager.setUser(user);
+        showIndexDashboard(user);
+      } catch (error) {
+        // Browser storage is only a presentation cache; it cannot keep a user signed in.
+        localStorage.removeItem('scUser');
+        localStorage.removeItem('sporthubUser');
+        const app = document.getElementById('indexApp');
+        if (app) app.style.display = 'none';
+        const home = document.getElementById('home');
+        if (home) home.style.display = '';
+        const features = document.getElementById('features');
+        if (features) features.style.display = '';
+        const footer = document.querySelector('footer');
+        if (footer) footer.style.display = '';
+      }
     });
   </script>
 >
