@@ -541,8 +541,13 @@ const SessionManager = {
     // backend-issued protected session before its workspace is displayed.
     const u = this.getUser();
     if (!u) { window.location.href = 'index.html'; return; }
-    if (role === 'Admin' && u.username !== 'admin_123') {
-      UIController.showToast('Admin access requires the authorized Admin account.', 'info');
+    if (role === 'Admin') {
+      if (u.username !== 'admin_123') {
+        UIController.showToast('Admin access requires the authorized Admin account.', 'info');
+        return;
+      }
+      // Never expose the admin workspace inside the public index shell.
+      window.location.href = 'admin-portal.html';
       return;
     }
     if (typeof showIndexDashboard === 'function') {

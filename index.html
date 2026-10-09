@@ -481,7 +481,8 @@
       if (res.success && res.user && res.user.role === 'Admin') {
         SessionManager.setUser(res.user);
         UIController.showToast('Admin signed in successfully.');
-        showIndexDashboard(res.user);
+        // Admin gets the dedicated protected admin workspace.
+        setTimeout(() => { window.location.href = 'admin-portal.html'; }, 250);
       } else {
         UIController.showToast(res.error || 'Invalid Admin credentials.','info');
       }
