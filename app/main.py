@@ -11,6 +11,9 @@ from typing import Any
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 from app.routers.health import router as health_router
+from app.routers.players import router as players_router
+from app.routers.certificates import router as certificates_router
+from app.routers.messages import router as messages_router
 
 app = FastAPI(
     title="SportsHub API",
@@ -21,6 +24,9 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(players_router)
+app.include_router(certificates_router)
+app.include_router(messages_router)
 
 
 
