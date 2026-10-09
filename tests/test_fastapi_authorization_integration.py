@@ -108,7 +108,7 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
         conn = database.get_db()
         try:
             conn.cursor().execute(
-                "INSERT INTO certificates (player_id, title, year) VALUES (?, 'Private award', 2026)",
+                "INSERT INTO certificates (player_id, title, issuing_org, year, achievement_text) VALUES (?, 'Private award', 'Test Org', 2026, 'Private')",
                 (self.user_ids["Player"],),
             )
             conn.commit()
