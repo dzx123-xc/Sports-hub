@@ -135,6 +135,11 @@
             <label class="form-label">Admin Password</label>
             <input id="adminPass" type="password" class="form-input" placeholder="Admin password" autocomplete="current-password">
           </div>
+          <div class="form-group">
+            <label class="form-label">Authenticator Code <span style="color:var(--text-muted);font-weight:400;">(if MFA is enabled)</span></label>
+            <input id="adminTotpCode" class="form-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code" autocomplete="one-time-code" aria-describedby="adminMfaHint">
+            <small id="adminMfaHint" style="color:var(--text-muted);">Enter the current code from your authenticator app when administrator MFA is configured.</small>
+          </div>
           <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="handleLandingAdminLogin()">
             LOGIN AS ADMIN
           </button>
@@ -476,9 +481,10 @@
     async function handleLandingAdminLogin() {
       const id = document.getElementById('adminIdent').value.trim();
       const pass = document.getElementById('adminPass').value;
+      const totpCode = document.getElementById('adminTotpCode').value.trim();
       if (!id || !pass) { UIController.showToast('Enter Admin username and password.','info'); return; }
-      if (id.toLowerCase() !== 'admin_123') { UIController.showToast('Invalid Admin credentials.','info'); return; }
-      const res = await DataService.login(id, pass);
+      if (totpCode && !/^\d{6}$/.test(totpCode)) { UIController.showToast('Authenticator code must be exactly 6 digits.','info'); return; }
+      const res = await DataService.login(id, pass, totpCode);
       if (res.success && res.user && res.user.role === 'Admin') {
         SessionManager.setUser(res.user);
         UIController.showToast('Admin signed in successfully.');
