@@ -49,7 +49,7 @@ def _recalculate(payload: dict) -> None:
         if not row:
             raise ValueError("Player profile not found")
         cert_count = cursor.execute("SELECT COUNT(*) AS count FROM certificates WHERE player_id = ?", (player_id,)).fetchone()["count"]
-        classification = calculate_player_classification(
+        classification, _composite_score = calculate_player_classification(
             float(row["skill_score"] or 0), float(row["performance_score"] or 0),
             float(row["progress_pct"] or 0), int(row["major_matches"] or 0), int(cert_count or 0)
         )
