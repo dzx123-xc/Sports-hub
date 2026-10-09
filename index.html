@@ -488,7 +488,7 @@
       }
     }
     async function handleLandingLogin() {
-      const id=document.getElementById('loginIdent').value.trim(), pass=document.getElementById('loginPass').value.trim();
+      const id=document.getElementById('loginIdent').value.trim(), pass=document.getElementById('loginPass').value;
       const res=await DataService.login(id,pass);
       if(res.success&&res.user){SessionManager.setUser(res.user);UIController.showToast('Signed in successfully as '+res.user.full_name);setTimeout(()=>SessionManager.redirectForRole(res.user.role),300);}
       else if(res.account_exists===false&&id.includes('@')){switchLandingTab('register');document.getElementById('regEmail').value=id.toLowerCase();UIController.showToast('No account found. Create a new SportsConnect account.','info');}

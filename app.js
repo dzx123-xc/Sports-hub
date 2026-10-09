@@ -251,7 +251,7 @@ const DataService = {
 
   async login(identifier, password) {
     identifier = String(identifier || '').trim();
-    password = String(password || '').trim();
+    password = String(password || '');
     try {
       // Email-first account discovery: an existing system email proceeds to login;
       // an unknown email is directed to account creation.
@@ -518,9 +518,21 @@ const SessionManager = {
   },
 
   async logout() {
-    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
-    localStorage.removeItem('scUser');
-    window.location.href = 'index.html';
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+    } catch (e) {
+      // Always clear the local presentation cache and leave the protected page.
+    } finally {
+      localStorage.removeItem('scUser');
+      localStorage.removeItem('sporthubUser');
+      window.location.replace('index.html?logged_out=1');
+    }
   },
 
   switchDemoUser(roleKey) {

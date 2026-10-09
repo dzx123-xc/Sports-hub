@@ -770,7 +770,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             # 2. Login
             if path == '/api/auth/login':
                 identifier = str(body.get('identifier', '')).strip()
-                password = str(body.get('password', '')).strip()
+                password = str(body.get('password', ''))
 
                 if not identifier or not password:
                     return self.send_json({"error": "Identifier and password required"}, 400)

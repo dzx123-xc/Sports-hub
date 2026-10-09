@@ -48,5 +48,17 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertIn('src="auth-guard.js"', text)
             self.assertIn('src="identity-sync.js"', text)
 
+
+    def test_login_preserves_password_whitespace_and_logout_clears_legacy_cache(self):
+        app = (ROOT / "app.js").read_text(encoding="utf-8")
+        index = (ROOT / "index.html").read_text(encoding="utf-8")
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertIn("password = String(password || '');", app)
+        self.assertIn("pass=document.getElementById('loginPass').value;", index)
+        self.assertIn("password = str(body.get('password', ''))", server)
+        self.assertIn("localStorage.removeItem('sporthubUser');", app)
+        self.assertIn("credentials: 'same-origin'", app)
+        self.assertIn("window.location.replace('index.html?logged_out=1');", app)
+
 if __name__ == "__main__":
     unittest.main()
