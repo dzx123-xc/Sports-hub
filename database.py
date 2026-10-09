@@ -75,7 +75,9 @@ class CompatCursor:
             self._cursor.execute("SELECT currval(pg_get_serial_sequence(%s, 'id')) AS id", (table,))
             row = self._cursor.fetchone()
             self._lastrowid = row["id"] if row else None
-        return result
+        # psycopg2 cursor.execute() returns None, but application code chains
+        # execute(...).fetchone()/fetchall(). Return the compatibility wrapper.
+        return self
     def executemany(self, query, seq_of_params):
         if self._postgres: query = self._replace_placeholders(query)
         return self._cursor.executemany(query, seq_of_params)
