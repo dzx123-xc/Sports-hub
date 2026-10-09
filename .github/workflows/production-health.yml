@@ -1,0 +1,18 @@
+name: SportsHub Production Health
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production liveness
+        run: curl --fail --silent --show-error --max-time 20 "${{ vars.PRODUCTION_BASE_URL || 'https://sports-hub-production-8f31.up.railway.app' }}/health"
+      - name: Check production database readiness
+        run: curl --fail --silent --show-error --max-time 20 "${{ vars.PRODUCTION_BASE_URL || 'https://sports-hub-production-8f31.up.railway.app' }}/health/ready"
