@@ -19,6 +19,21 @@ _ALLOWED = {
 }
 
 
+def _matches_file_signature(content_type: str, body: bytes) -> bool:
+    """Reject uploads whose bytes do not match their declared media type."""
+    if content_type == "image/jpeg":
+        return body.startswith(b"\\xff\\xd8\\xff")
+    if content_type == "image/png":
+        return body.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+    if content_type == "image/webp":
+        return len(body) >= 12 and body[:4] == b"RIFF" and body[8:12] == b"WEBP"
+    if content_type == "video/mp4":
+        return len(body) >= 12 and body[4:8] == b"ftyp"
+    if content_type == "video/webm":
+        return body.startswith(b"\\x1a\\x45\\xdf\\xa3")
+    return False
+
+
 class MediaAccessRequest(BaseModel):
     object_path: str = Field(min_length=1, max_length=300)
 
@@ -42,6 +57,8 @@ async def upload_private_media(request: Request) -> dict:
     body = await request.body()
     if len(body) != declared_size or len(body) > max_bytes:
         raise HTTPException(status_code=400, detail="Upload size did not match Content-Length")
+    if not _matches_file_signature(content_type, body):
+        raise HTTPException(status_code=415, detail="File contents do not match the declared media type")
     object_path = f"user-{int(actor['user_id'])}/{kind}/{secrets.token_urlsafe(18)}.{extension}"
     try:
         storage = SupabasePrivateStorage()
