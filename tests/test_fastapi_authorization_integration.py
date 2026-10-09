@@ -77,6 +77,14 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0]["message_text"], "in-thread")
 
+    def test_private_media_cannot_be_accessed_across_user_boundaries(self):
+        response = self.client.post(
+            "/api/media/signed-url",
+            json={"object_path": "user-2/avatar/private.webp"},
+            cookies={"sc_session": self.tokens["Player"]},
+        )
+        self.assertEqual(response.status_code, 403)
+
     def test_message_history_requires_a_session(self):
         response = self.client.get("/api/messages")
         self.assertEqual(response.status_code, 401)
