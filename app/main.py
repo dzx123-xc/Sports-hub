@@ -10,6 +10,12 @@ from typing import Any
 
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
+from app.routers.health import router as health_router
+from app.routers.players import router as players_router
+from app.routers.certificates import router as certificates_router
+from app.routers.messages import router as messages_router
+from app.routers.media import router as media_router
+from app.routers.admin_jobs import router as admin_jobs_router
 
 app = FastAPI(
     title="SportsHub API",
@@ -18,6 +24,14 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None if os.getenv("RAILWAY_ENVIRONMENT_NAME") == "production" else "/openapi.json",
 )
+
+app.include_router(health_router)
+app.include_router(players_router)
+app.include_router(certificates_router)
+app.include_router(messages_router)
+app.include_router(media_router)
+app.include_router(admin_jobs_router)
+
 
 
 @app.middleware("http")

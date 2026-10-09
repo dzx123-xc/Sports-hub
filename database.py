@@ -55,7 +55,7 @@ def verify_pw(password: str, stored_hash: str) -> bool:
     return hmac.compare_digest(legacy, stored_hash)
 
 class CompatCursor:
-    _LASTROWID_TABLES = {"users", "certificates", "matches", "trials", "reports"}
+    _LASTROWID_TABLES = {"users", "certificates", "matches", "trials", "reports", "background_jobs", "messages", "notifications"}
     def __init__(self, raw_cursor, postgres=False):
         self._cursor, self._postgres, self._lastrowid = raw_cursor, postgres, None
     @staticmethod
@@ -382,6 +382,17 @@ def init_db(force: bool = False):
         expires_at TEXT NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS background_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_type TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        error_text TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     );
     """
     if USING_POSTGRES:

@@ -18,6 +18,8 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from database import DB_PATH, get_db, hash_pw, verify_pw, init_db, USING_POSTGRES
+from app.security.totp import verify_totp
+from app.security.privacy import can_view_visibility
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -273,7 +275,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
 
-        if path == '/health':
+        if path in ('/health', '/health/ready'):
             try:
                 health_conn = get_db()
                 health_conn.cursor().execute("SELECT 1").fetchone()
@@ -472,78 +474,93 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 player = cursor.fetchone()
                 if not player:
                     return self.send_json({"error": "Player not found"}, 404)
+                viewer_id = current_user_id(self)
+                viewer_is_admin = is_admin_request(self)
+                cursor.execute(
+                    "SELECT profile_visibility, stats_visibility, certs_visibility FROM privacy_settings WHERE user_id = ?",
+                    (player_id,),
+                )
+                privacy_row = cursor.fetchone()
+                privacy = dict(privacy_row) if privacy_row else {
+                    'profile_visibility': 'public', 'stats_visibility': 'public', 'certs_visibility': 'public'
+                }
+                is_owner = bool(viewer_id and str(viewer_id) == str(player_id))
+                is_connected = False
+                if viewer_id and not is_owner:
+                    cursor.execute(
+                        "SELECT 1 FROM connections WHERE status = 'accepted' AND ((requester_id = ? AND recipient_id = ?) OR (requester_id = ? AND recipient_id = ?)) LIMIT 1",
+                        (viewer_id, player_id, player_id, viewer_id),
+                    )
+                    is_connected = cursor.fetchone() is not None
+                if not can_view_visibility(privacy['profile_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
+                    return self.send_json({"error": "Player profile is private."}, 404)
                 player_data = dict(player)
 
-                # Sports tests
-                cursor.execute("SELECT * FROM sports_tests WHERE player_id = ? ORDER BY date_taken DESC", (player_id,))
-                player_data['tests'] = [dict(r) for r in cursor.fetchall()]
+                if can_view_visibility(privacy['stats_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
+                    cursor.execute("SELECT * FROM sports_tests WHERE player_id = ? ORDER BY date_taken DESC", (player_id,))
+                    player_data['tests'] = [dict(r) for r in cursor.fetchall()]
+                else:
+                    player_data['tests'] = []
+                    for key in ('rating', 'skill_score', 'performance_score', 'progress_pct', 'major_matches',
+                                'verified_local_matches', 'consistency_score'):
+                        player_data[key] = None
 
-                # Certificates
-                cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY year DESC", (player_id,))
-                player_data['certificates'] = [dict(r) for r in cursor.fetchall()]
+                if can_view_visibility(privacy['certs_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
+                    cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY year DESC", (player_id,))
+                    player_data['certificates'] = [dict(r) for r in cursor.fetchall()]
+                else:
+                    player_data['certificates'] = []
 
-                # Match history with teammate and opponent details
-                cursor.execute("""
-                SELECT m.id AS match_id, m.title, m.sport, m.team_a, m.team_b, m.match_date, m.location,
-                       m.result_summary, m.status AS match_status, m.verified_by,
-                       mps.team_name, mps.role_played, mps.stats_json, mps.performance_rating, mps.verified_status
-                FROM match_player_stats mps
-                JOIN matches m ON mps.match_id = m.id
-                WHERE mps.player_id = ?
-                ORDER BY m.match_date DESC
-                """, (player_id,))
-                matches = []
-                for m in cursor.fetchall():
-                    m_dict = dict(m)
-                    try:
-                        m_dict['stats'] = json.loads(m_dict['stats_json'])
-                    except Exception:
-                        m_dict['stats'] = {}
-
-                    # Fetch teammates (Played With)
+                # Match history follows the same stats visibility policy.
+                if can_view_visibility(privacy['stats_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
                     cursor.execute("""
-                    SELECT u.id, u.full_name, u.avatar, mps2.role_played, mps2.stats_json
-                    FROM match_player_stats mps2
-                    JOIN users u ON mps2.player_id = u.id
-                    WHERE mps2.match_id = ? AND mps2.team_name = ? AND mps2.player_id != ?
-                    """, (m_dict['match_id'], m_dict['team_name'], player_id))
-                    m_dict['teammates'] = [dict(r) for r in cursor.fetchall()]
-                    for t in m_dict['teammates']:
+                    SELECT m.id AS match_id, m.title, m.sport, m.team_a, m.team_b, m.match_date, m.location,
+                           m.result_summary, m.status AS match_status, m.verified_by,
+                           mps.team_name, mps.role_played, mps.stats_json, mps.performance_rating, mps.verified_status
+                    FROM match_player_stats mps JOIN matches m ON mps.match_id = m.id
+                    WHERE mps.player_id = ? ORDER BY m.match_date DESC
+                    """, (player_id,))
+                    player_data['matches'] = []
+                    for row in cursor.fetchall():
+                        item = dict(row)
                         try:
-                            t['stats'] = json.loads(t['stats_json'])
-                        except Exception:
-                            t['stats'] = {}
-
-                    # Fetch opponents (Played Against)
-                    opp_team = m_dict['team_b'] if m_dict['team_name'] == m_dict['team_a'] else m_dict['team_a']
-                    cursor.execute("""
-                    SELECT u.id, u.full_name, u.avatar, mps2.role_played, mps2.stats_json
-                    FROM match_player_stats mps2
-                    JOIN users u ON mps2.player_id = u.id
-                    WHERE mps2.match_id = ? AND mps2.team_name = ?
-                    """, (m_dict['match_id'], opp_team))
-                    m_dict['opponents'] = [dict(r) for r in cursor.fetchall()]
-                    for o in m_dict['opponents']:
-                        try:
-                            o['stats'] = json.loads(o['stats_json'])
-                        except Exception:
-                            o['stats'] = {}
-
-                    matches.append(m_dict)
-
-                player_data['matches'] = matches
+                            item['stats'] = json.loads(item.get('stats_json') or '{}')
+                        except (TypeError, ValueError):
+                            item['stats'] = {}
+                        player_data['matches'].append(item)
+                else:
+                    player_data['matches'] = []
                 return self.send_json({"player": player_data})
 
             # 4. Certificates
             elif path == '/api/certificates':
-                player_id = qs.get('player_id', [None])[0]
-                if player_id:
-                    cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY id DESC", (player_id,))
+                viewer_id = current_user_id(self)
+                viewer_is_admin = is_admin_request(self)
+                requested_player = qs.get('player_id', [None])[0]
+                if requested_player:
+                    try:
+                        requested_player_id = int(requested_player)
+                    except (TypeError, ValueError):
+                        return self.send_json({"error": "Invalid player_id."}, 400)
+                    cursor.execute("SELECT certs_visibility FROM privacy_settings WHERE user_id = ?", (requested_player_id,))
+                    privacy_row = cursor.fetchone()
+                    visibility = privacy_row['certs_visibility'] if privacy_row else 'public'
+                    own = bool(viewer_id and str(viewer_id) == str(requested_player_id))
+                    connected = False
+                    if viewer_id and not own:
+                        cursor.execute("SELECT 1 FROM connections WHERE status = 'accepted' AND ((requester_id = ? AND recipient_id = ?) OR (requester_id = ? AND recipient_id = ?)) LIMIT 1", (viewer_id, requested_player_id, requested_player_id, viewer_id))
+                        connected = cursor.fetchone() is not None
+                    if not can_view_visibility(visibility, is_admin=viewer_is_admin, is_owner=own, is_connected=connected):
+                        return self.send_json({"error": "Certificates are private."}, 404)
+                    cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY id DESC", (requested_player_id,))
+                elif viewer_is_admin:
+                    cursor.execute("SELECT c.*, u.full_name AS player_name, u.avatar AS player_avatar FROM certificates c JOIN users u ON c.player_id = u.id ORDER BY c.id DESC")
                 else:
                     cursor.execute("""
                     SELECT c.*, u.full_name AS player_name, u.avatar AS player_avatar
-                    FROM certificates c
-                    JOIN users u ON c.player_id = u.id
+                    FROM certificates c JOIN users u ON c.player_id = u.id
+                    LEFT JOIN privacy_settings ps ON ps.user_id = c.player_id
+                    WHERE COALESCE(ps.certs_visibility, 'public') = 'public'
                     ORDER BY c.id DESC
                     """)
                 certs = [dict(r) for r in cursor.fetchall()]
@@ -837,6 +854,12 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 # Admin is a separate protected identity. No database/demo admin can authenticate.
                 if identifier.lower() == ADMIN_USERNAME.lower() or identifier.lower() == 'admin@sportsconnect.com':
                     if ADMIN_PASSWORD and identifier.lower() == ADMIN_USERNAME.lower() and password == ADMIN_PASSWORD:
+                        totp_secret = os.getenv('ADMIN_TOTP_SECRET', '').strip()
+                        if totp_secret and not verify_totp(totp_secret, body.get('totp_code', '')):
+                            return self.send_json({'error': 'A valid administrator authenticator code is required.'}, 401)
+                        if not totp_secret and os.getenv('ADMIN_TOTP_REQUIRED', '').lower() in ('1', 'true', 'yes'):
+                            logger.error("ADMIN_TOTP_REQUIRED is enabled but ADMIN_TOTP_SECRET is missing")
+                            return self.send_json({'error': 'Administrator MFA is not configured. Contact the platform operator.'}, 503)
                         token = issue_admin_session()
                         admin_user = {
                             'id': 0, 'username': ADMIN_USERNAME, 'email': 'admin@sportsconnect.local',
