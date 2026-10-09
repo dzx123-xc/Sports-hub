@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import database
 from app.repositories.database import connection
-from app.workers.queue import claim_one
+from app.workers.queue import claim_one, fail
 
 
 class BackgroundQueueLeaseTests(unittest.TestCase):
@@ -46,6 +46,14 @@ class BackgroundQueueLeaseTests(unittest.TestCase):
     def test_lease_duration_must_be_positive(self):
         with self.assertRaises(ValueError):
             claim_one(lease_seconds=0)
+
+    def test_retry_budget_must_be_positive_when_claiming(self):
+        with self.assertRaises(ValueError):
+            claim_one(max_attempts=0)
+
+    def test_retry_budget_must_be_positive_when_failing(self):
+        with self.assertRaises(ValueError):
+            fail(1, "error", max_attempts=0)
 
 
 if __name__ == "__main__":
