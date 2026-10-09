@@ -515,57 +515,28 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     player_data['certificates'] = []
 
-                # Match history with teammate and opponent details
-                cursor.execute("""
-                SELECT m.id AS match_id, m.title, m.sport, m.team_a, m.team_b, m.match_date, m.location,
-                       m.result_summary, m.status AS match_status, m.verified_by,
-                       mps.team_name, mps.role_played, mps.stats_json, mps.performance_rating, mps.verified_status
-                FROM match_player_stats mps
-                JOIN matches m ON mps.match_id = m.id
-                WHERE mps.player_id = ?
-                ORDER BY m.match_date DESC
-                """, (player_id,))
-                matches = []
-                for m in cursor.fetchall():
-                    m_dict = dict(m)
-                    try:
-                        m_dict['stats'] = json.loads(m_dict['stats_json'])
-                    except Exception:
-                        m_dict['stats'] = {}
-
-                    # Fetch teammates (Played With)
+                # Match history follows the same stats visibility policy.
+                if viewer_is_admin or is_owner or privacy['stats_visibility'] == 'public' or (
+                    privacy['stats_visibility'] == 'connections_only' and is_connected
+                ):
                     cursor.execute("""
-                    SELECT u.id, u.full_name, u.avatar, mps2.role_played, mps2.stats_json
-                    FROM match_player_stats mps2
-                    JOIN users u ON mps2.player_id = u.id
-                    WHERE mps2.match_id = ? AND mps2.team_name = ? AND mps2.player_id != ?
-                    """, (m_dict['match_id'], m_dict['team_name'], player_id))
-                    m_dict['teammates'] = [dict(r) for r in cursor.fetchall()]
-                    for t in m_dict['teammates']:
+                    SELECT m.id AS match_id, m.title, m.sport, m.team_a, m.team_b, m.match_date, m.location,
+                           m.result_summary, m.status AS match_status, m.verified_by,
+                           mps.team_name, mps.role_played, mps.stats_json, mps.performance_rating, mps.verified_status
+                    FROM match_player_stats mps JOIN matches m ON mps.match_id = m.id
+                    WHERE mps.player_id = ? ORDER BY m.match_date DESC
+                    """, (player_id,))
+                    player_data['matches'] = []
+                    for row in cursor.fetchall():
+                        item = dict(row)
                         try:
-                            t['stats'] = json.loads(t['stats_json'])
-                        except Exception:
-                            t['stats'] = {}
-
-                    # Fetch opponents (Played Against)
-                    opp_team = m_dict['team_b'] if m_dict['team_name'] == m_dict['team_a'] else m_dict['team_a']
-                    cursor.execute("""
-                    SELECT u.id, u.full_name, u.avatar, mps2.role_played, mps2.stats_json
-                    FROM match_player_stats mps2
-                    JOIN users u ON mps2.player_id = u.id
-                    WHERE mps2.match_id = ? AND mps2.team_name = ?
-                    """, (m_dict['match_id'], opp_team))
-                    m_dict['opponents'] = [dict(r) for r in cursor.fetchall()]
-                    for o in m_dict['opponents']:
-                        try:
-                            o['stats'] = json.loads(o['stats_json'])
-                        except Exception:
-                            o['stats'] = {}
-
-                    matches.append(m_dict)
-
-                player_data['matches'] = matches
-                return self.send_json({"player": player_data})
+                            item['stats'] = json.loads(item.get('stats_json') or '{}')
+                        except (TypeError, ValueError):
+                            item['stats'] = {}
+                        player_data['matches'].append(item)
+                else:
+                    player_data['matches'] = []
+                return self.send_json({"player": player_data})            return self.send_json({"player": player_data})
 
             # 4. Certificates
             elif path == '/api/certificates':
