@@ -79,5 +79,12 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("credentials: 'same-origin'", index)
         self.assertIn("localStorage.removeItem('sporthubUser');", index)
 
-if __name__ == "__main__":
+
+    def test_report_submission_never_returns_fake_success_on_api_failure(self):
+        app = (ROOT / "app.js").read_text(encoding="utf-8")
+        self.assertIn("success: false", app)
+        self.assertIn("Your report was not submitted.", app)
+        self.assertNotIn("return { success: true, report_id: 1024, status: 'Under Review' };", app)
+        self.assertIn("Report could not be submitted. Please try again.", app)
+\nif __name__ == "__main__":
     unittest.main()
