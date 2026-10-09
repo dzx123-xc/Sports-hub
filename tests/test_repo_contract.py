@@ -80,6 +80,23 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("localStorage.removeItem('sporthubUser');", index)
 
 
+    def test_certificate_verification_requires_admin_session(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        route = server.split("elif path.startswith('/api/certificates/') and path.endswith('/verify'):", 1)[1]
+        self.assertIn("if not is_admin_request(self):", route[:250])
+        self.assertNotIn("body.get('admin_name'", route[:700])
+
+    def test_registration_accepts_only_public_roles(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertIn("if role not in ('Player', 'Coach', 'Club', 'Organizer', 'Referee'):", server)
+
+    def test_message_and_report_inputs_are_validated(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        self.assertIn("You cannot message your own account.", server)
+        self.assertIn("Message must contain 1–5000 characters.", server)
+        self.assertIn("You cannot report your own account.", server)
+        self.assertIn("Report description must contain 1–5000 characters.", server)
+
     def test_report_submission_never_returns_fake_success_on_api_failure(self):
         app = (ROOT / "app.js").read_text(encoding="utf-8")
         self.assertIn("success: false", app)
