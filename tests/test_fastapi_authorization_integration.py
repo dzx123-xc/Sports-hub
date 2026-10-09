@@ -79,6 +79,15 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0]["message_text"], "in-thread")
 
+    def test_media_upload_rejects_mismatched_file_signature(self):
+        response = self.client.post(
+            "/api/media",
+            content=b"not actually a jpeg",
+            headers={"Content-Type": "image/jpeg", "X-Media-Kind": "avatar"},
+            cookies={"sc_session": self.tokens["Player"]},
+        )
+        self.assertEqual(response.status_code, 415)
+
     def test_private_media_cannot_be_accessed_across_user_boundaries(self):
         response = self.client.post(
             "/api/media/signed-url",
