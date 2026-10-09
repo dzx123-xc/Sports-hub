@@ -275,7 +275,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
 
-        if path == '/health':
+        if path in ('/health', '/health/ready'):
             try:
                 health_conn = get_db()
                 health_conn.cursor().execute("SELECT 1").fetchone()
