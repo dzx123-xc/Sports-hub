@@ -4,6 +4,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.repositories import messages as message_repository
+from app.workers.queue import enqueue
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MessagingError(Exception):
@@ -29,4 +33,16 @@ def send_message(sender_id: int, recipient_id: int, text: str, message_type: str
     if not message_repository.active_user(recipient_id):
         raise MessagingError("Recipient account not found or inactive", 404)
     timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-    return message_repository.create_message(sender_id, recipient_id, normalized, message_type, timestamp)
+    message = message_repository.create_message(sender_id, recipient_id, normalized, message_type, timestamp)
+    try:
+        enqueue("notification.create", {
+            "user_id": recipient_id,
+            "category": "Messages",
+            "title": "New message",
+            "message": "You received a new message.",
+            "link": f"/messages.html?user_id={sender_id}",
+        })
+    except Exception:
+        # Message delivery must not fail just because the optional worker queue is unavailable.
+        logger.exception("Could not enqueue new-message notification")
+    return message
