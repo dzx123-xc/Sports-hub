@@ -15,6 +15,7 @@ from app.routers.players import router as players_router
 from app.routers.certificates import router as certificates_router
 from app.routers.messages import router as messages_router
 from app.routers.media import router as media_router
+from app.routers.admin_jobs import router as admin_jobs_router
 
 app = FastAPI(
     title="SportsHub API",
@@ -29,6 +30,7 @@ app.include_router(players_router)
 app.include_router(certificates_router)
 app.include_router(messages_router)
 app.include_router(media_router)
+app.include_router(admin_jobs_router)
 
 
 
