@@ -19,6 +19,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from database import DB_PATH, get_db, hash_pw, verify_pw, init_db, USING_POSTGRES
 from app.security.totp import verify_totp
+from app.security.privacy import can_view_visibility
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -491,15 +492,11 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                         (viewer_id, player_id, player_id, viewer_id),
                     )
                     is_connected = cursor.fetchone() is not None
-                if not (viewer_is_admin or is_owner or privacy['profile_visibility'] == 'public' or (
-                    privacy['profile_visibility'] == 'connections_only' and is_connected
-                )):
+                if not can_view_visibility(privacy['profile_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
                     return self.send_json({"error": "Player profile is private."}, 404)
                 player_data = dict(player)
 
-                if viewer_is_admin or is_owner or privacy['stats_visibility'] == 'public' or (
-                    privacy['stats_visibility'] == 'connections_only' and is_connected
-                ):
+                if can_view_visibility(privacy['stats_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
                     cursor.execute("SELECT * FROM sports_tests WHERE player_id = ? ORDER BY date_taken DESC", (player_id,))
                     player_data['tests'] = [dict(r) for r in cursor.fetchall()]
                 else:
@@ -508,18 +505,14 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                                 'verified_local_matches', 'consistency_score'):
                         player_data[key] = None
 
-                if viewer_is_admin or is_owner or privacy['certs_visibility'] == 'public' or (
-                    privacy['certs_visibility'] == 'connections_only' and is_connected
-                ):
+                if can_view_visibility(privacy['certs_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
                     cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY year DESC", (player_id,))
                     player_data['certificates'] = [dict(r) for r in cursor.fetchall()]
                 else:
                     player_data['certificates'] = []
 
                 # Match history follows the same stats visibility policy.
-                if viewer_is_admin or is_owner or privacy['stats_visibility'] == 'public' or (
-                    privacy['stats_visibility'] == 'connections_only' and is_connected
-                ):
+                if can_view_visibility(privacy['stats_visibility'], is_admin=viewer_is_admin, is_owner=is_owner, is_connected=is_connected):
                     cursor.execute("""
                     SELECT m.id AS match_id, m.title, m.sport, m.team_a, m.team_b, m.match_date, m.location,
                            m.result_summary, m.status AS match_status, m.verified_by,
@@ -557,7 +550,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                     if viewer_id and not own:
                         cursor.execute("SELECT 1 FROM connections WHERE status = 'accepted' AND ((requester_id = ? AND recipient_id = ?) OR (requester_id = ? AND recipient_id = ?)) LIMIT 1", (viewer_id, requested_player_id, requested_player_id, viewer_id))
                         connected = cursor.fetchone() is not None
-                    if not (viewer_is_admin or own or visibility == 'public' or (visibility == 'connections_only' and connected)):
+                    if not can_view_visibility(visibility, is_admin=viewer_is_admin, is_owner=own, is_connected=connected):
                         return self.send_json({"error": "Certificates are private."}, 404)
                     cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY id DESC", (requested_player_id,))
                 elif viewer_is_admin:
