@@ -87,6 +87,62 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_certificate_visibility_is_enforced_for_other_roles(self):
+        conn = database.get_db()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO certificates (player_id, title, year) VALUES (?, 'Private award', 2026)",
+                (self.user_ids["Player"],),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        response = self.client.get(
+            "/api/certificates?player_id=" + str(self.user_ids["Player"]),
+            cookies={"sc_session": self.tokens["Coach"]},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_certificate_owner_can_view_own_private_certificate(self):
+        conn = database.get_db()
+        try:
+            conn.cursor().execute(
+                "INSERT INTO certificates (player_id, title, year) VALUES (?, 'Private award', 2026)",
+                (self.user_ids["Player"],),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        response = self.client.get(
+            "/api/certificates?player_id=" + str(self.user_ids["Player"]),
+            cookies={"sc_session": self.tokens["Player"]},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["certificates"]), 1)
+
+    def test_message_post_rejects_self_message(self):
+        response = self.client.post(
+            "/api/messages",
+            json={"recipient_id": self.user_ids["Player"], "message_text": "self", "message_type": "text"},
+            cookies={"sc_session": self.tokens["Player"]},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_message_post_rejects_inactive_recipient(self):
+        conn = database.get_db()
+        try:
+            conn.cursor().execute("UPDATE users SET status = 'inactive' WHERE id = ?", (self.user_ids["Coach"],))
+            conn.commit()
+        finally:
+            conn.close()
+        response = self.client.post(
+            "/api/messages",
+            json={"recipient_id": self.user_ids["Coach"], "message_text": "hello", "message_type": "text"},
+            cookies={"sc_session": self.tokens["Player"]},
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_message_history_requires_a_session(self):
         response = self.client.get("/api/messages")
         self.assertEqual(response.status_code, 401)
