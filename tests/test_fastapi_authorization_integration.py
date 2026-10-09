@@ -21,6 +21,7 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
         database.init_db(force=True)
         self.client = TestClient(app)
         self.tokens = {}
+        self.user_ids = {}
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         expires = (now + timedelta(hours=1)).isoformat()
         conn = database.get_db()
@@ -33,6 +34,7 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
                     (f"user{i}", f"user{i}@example.test", "test-hash", role, f"User {i}"),
                 )
                 user_id = cursor.lastrowid
+                self.user_ids[role] = user_id
                 self.tokens[role] = f"token-{role}"
                 token_hash = hashlib.sha256(self.tokens[role].encode()).hexdigest()
                 cursor.execute(
@@ -49,8 +51,8 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
                         (user_id,),
                     )
             # Add two unrelated messages so conversation scoping can be verified.
-            cursor.execute("INSERT INTO messages (sender_id, recipient_id, message_text, timestamp) VALUES (1, 2, 'in-thread', ?)", (now.isoformat(),))
-            cursor.execute("INSERT INTO messages (sender_id, recipient_id, message_text, timestamp) VALUES (1, 3, 'not-in-thread', ?)", (now.isoformat(),))
+            cursor.execute("INSERT INTO messages (sender_id, recipient_id, message_text, timestamp) VALUES (?, ?, 'in-thread', ?)", (self.user_ids['Player'], self.user_ids['Coach'], now.isoformat()))
+            cursor.execute("INSERT INTO messages (sender_id, recipient_id, message_text, timestamp) VALUES (?, ?, 'not-in-thread', ?)", (self.user_ids['Player'], self.user_ids['Club'], now.isoformat()))
             conn.commit()
         finally:
             conn.close()
@@ -62,16 +64,16 @@ class FastApiAuthorizationIntegrationTests(unittest.TestCase):
 
     def test_private_profile_is_not_visible_to_other_account_roles(self):
         for role in ("Coach", "Club", "Organizer", "Referee"):
-            response = self.client.get("/api/players/1", cookies={"sc_session": self.tokens[role]})
+            response = self.client.get("/api/players/" + str(self.user_ids["Player"]), cookies={"sc_session": self.tokens[role]})
             self.assertEqual(response.status_code, 404, role)
 
     def test_private_profile_is_visible_to_owner(self):
-        response = self.client.get("/api/players/1", cookies={"sc_session": self.tokens["Player"]})
+        response = self.client.get("/api/players/" + str(self.user_ids["Player"]), cookies={"sc_session": self.tokens["Player"]})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["player"]["certificates"], [])
 
     def test_message_history_is_scoped_to_the_requested_conversation(self):
-        response = self.client.get("/api/messages?other_id=2", cookies={"sc_session": self.tokens["Player"]})
+        response = self.client.get("/api/messages?other_id=" + str(self.user_ids["Coach"]), cookies={"sc_session": self.tokens["Player"]})
         self.assertEqual(response.status_code, 200)
         messages = response.json()["messages"]
         self.assertEqual(len(messages), 1)
