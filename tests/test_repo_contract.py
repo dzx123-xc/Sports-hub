@@ -78,5 +78,6 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("const endpoint = isAdmin ? '/api/admin/session' : '/api/auth/me';", index)
         self.assertIn("credentials: 'same-origin'", index)
         self.assertIn("localStorage.removeItem('sporthubUser');", index)
-\nif __name__ == "__main__":
+
+if __name__ == "__main__":
     unittest.main()
