@@ -35,6 +35,8 @@ def claim_one(*, lease_seconds: int = 300, max_attempts: int = 5) -> dict[str, A
     """
     if lease_seconds < 1:
         raise ValueError("lease_seconds must be positive")
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be positive")
     now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
     now = now_dt.isoformat()
     stale_before = (now_dt - timedelta(seconds=lease_seconds)).isoformat()
@@ -54,7 +56,10 @@ def claim_one(*, lease_seconds: int = 300, max_attempts: int = 5) -> dict[str, A
             conn.commit()
             return None
         job = dict(row)
-        cursor.execute("UPDATE background_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'pending'", (now, job["id"]))
+        cursor.execute(
+            "UPDATE background_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'pending'",
+            (now, job["id"]),
+        )
         if cursor.rowcount != 1:
             conn.rollback()
             return None
@@ -63,18 +68,24 @@ def claim_one(*, lease_seconds: int = 300, max_attempts: int = 5) -> dict[str, A
         job["attempts"] = int(job.get("attempts") or 0) + 1
         return job
 
+
 def finish(job_id: int) -> None:
     now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with connection() as conn:
-        conn.cursor().execute("UPDATE background_jobs SET status = 'completed', updated_at = ?, error_text = NULL WHERE id = ?", (now, job_id))
+        conn.cursor().execute(
+            "UPDATE background_jobs SET status = 'completed', updated_at = ?, error_text = NULL WHERE id = ? AND status = 'processing'",
+            (now, job_id),
+        )
         conn.commit()
 
 
 def fail(job_id: int, error: str, max_attempts: int = 5) -> None:
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be positive")
     now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     with connection() as conn:
         conn.cursor().execute(
-            "UPDATE background_jobs SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END, error_text = ?, updated_at = ? WHERE id = ?",
+            "UPDATE background_jobs SET status = CASE WHEN attempts >= ? THEN 'failed' ELSE 'pending' END, error_text = ?, updated_at = ? WHERE id = ? AND status = 'processing'",
             (max_attempts, str(error)[:1000], now, job_id),
         )
         conn.commit()
