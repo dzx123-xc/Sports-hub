@@ -55,7 +55,7 @@ def verify_pw(password: str, stored_hash: str) -> bool:
     return hmac.compare_digest(legacy, stored_hash)
 
 class CompatCursor:
-    _LASTROWID_TABLES = {"users", "certificates", "matches", "trials", "reports"}
+    _LASTROWID_TABLES = {"users", "certificates", "matches", "trials", "reports", "background_jobs", "messages", "notifications"}
     def __init__(self, raw_cursor, postgres=False):
         self._cursor, self._postgres, self._lastrowid = raw_cursor, postgres, None
     @staticmethod
