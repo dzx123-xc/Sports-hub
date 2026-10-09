@@ -472,15 +472,48 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 player = cursor.fetchone()
                 if not player:
                     return self.send_json({"error": "Player not found"}, 404)
+                viewer_id = current_user_id(self)
+                viewer_is_admin = is_admin_request(self)
+                cursor.execute(
+                    "SELECT profile_visibility, stats_visibility, certs_visibility FROM privacy_settings WHERE user_id = ?",
+                    (player_id,),
+                )
+                privacy_row = cursor.fetchone()
+                privacy = dict(privacy_row) if privacy_row else {
+                    'profile_visibility': 'public', 'stats_visibility': 'public', 'certs_visibility': 'public'
+                }
+                is_owner = bool(viewer_id and str(viewer_id) == str(player_id))
+                is_connected = False
+                if viewer_id and not is_owner:
+                    cursor.execute(
+                        "SELECT 1 FROM connections WHERE status = 'accepted' AND ((requester_id = ? AND recipient_id = ?) OR (requester_id = ? AND recipient_id = ?)) LIMIT 1",
+                        (viewer_id, player_id, player_id, viewer_id),
+                    )
+                    is_connected = cursor.fetchone() is not None
+                if not (viewer_is_admin or is_owner or privacy['profile_visibility'] == 'public' or (
+                    privacy['profile_visibility'] == 'connections_only' and is_connected
+                )):
+                    return self.send_json({"error": "Player profile is private."}, 404)
                 player_data = dict(player)
 
-                # Sports tests
-                cursor.execute("SELECT * FROM sports_tests WHERE player_id = ? ORDER BY date_taken DESC", (player_id,))
-                player_data['tests'] = [dict(r) for r in cursor.fetchall()]
+                if viewer_is_admin or is_owner or privacy['stats_visibility'] == 'public' or (
+                    privacy['stats_visibility'] == 'connections_only' and is_connected
+                ):
+                    cursor.execute("SELECT * FROM sports_tests WHERE player_id = ? ORDER BY date_taken DESC", (player_id,))
+                    player_data['tests'] = [dict(r) for r in cursor.fetchall()]
+                else:
+                    player_data['tests'] = []
+                    for key in ('rating', 'skill_score', 'performance_score', 'progress_pct', 'major_matches',
+                                'verified_local_matches', 'consistency_score'):
+                        player_data[key] = None
 
-                # Certificates
-                cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY year DESC", (player_id,))
-                player_data['certificates'] = [dict(r) for r in cursor.fetchall()]
+                if viewer_is_admin or is_owner or privacy['certs_visibility'] == 'public' or (
+                    privacy['certs_visibility'] == 'connections_only' and is_connected
+                ):
+                    cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY year DESC", (player_id,))
+                    player_data['certificates'] = [dict(r) for r in cursor.fetchall()]
+                else:
+                    player_data['certificates'] = []
 
                 # Match history with teammate and opponent details
                 cursor.execute("""
@@ -536,14 +569,33 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
 
             # 4. Certificates
             elif path == '/api/certificates':
-                player_id = qs.get('player_id', [None])[0]
-                if player_id:
-                    cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY id DESC", (player_id,))
+                viewer_id = current_user_id(self)
+                viewer_is_admin = is_admin_request(self)
+                requested_player = qs.get('player_id', [None])[0]
+                if requested_player:
+                    try:
+                        requested_player_id = int(requested_player)
+                    except (TypeError, ValueError):
+                        return self.send_json({"error": "Invalid player_id."}, 400)
+                    cursor.execute("SELECT certs_visibility FROM privacy_settings WHERE user_id = ?", (requested_player_id,))
+                    privacy_row = cursor.fetchone()
+                    visibility = privacy_row['certs_visibility'] if privacy_row else 'public'
+                    own = bool(viewer_id and str(viewer_id) == str(requested_player_id))
+                    connected = False
+                    if viewer_id and not own:
+                        cursor.execute("SELECT 1 FROM connections WHERE status = 'accepted' AND ((requester_id = ? AND recipient_id = ?) OR (requester_id = ? AND recipient_id = ?)) LIMIT 1", (viewer_id, requested_player_id, requested_player_id, viewer_id))
+                        connected = cursor.fetchone() is not None
+                    if not (viewer_is_admin or own or visibility == 'public' or (visibility == 'connections_only' and connected)):
+                        return self.send_json({"error": "Certificates are private."}, 404)
+                    cursor.execute("SELECT * FROM certificates WHERE player_id = ? ORDER BY id DESC", (requested_player_id,))
+                elif viewer_is_admin:
+                    cursor.execute("SELECT c.*, u.full_name AS player_name, u.avatar AS player_avatar FROM certificates c JOIN users u ON c.player_id = u.id ORDER BY c.id DESC")
                 else:
                     cursor.execute("""
                     SELECT c.*, u.full_name AS player_name, u.avatar AS player_avatar
-                    FROM certificates c
-                    JOIN users u ON c.player_id = u.id
+                    FROM certificates c JOIN users u ON c.player_id = u.id
+                    LEFT JOIN privacy_settings ps ON ps.user_id = c.player_id
+                    WHERE COALESCE(ps.certs_visibility, 'public') = 'public'
                     ORDER BY c.id DESC
                     """)
                 certs = [dict(r) for r in cursor.fetchall()]
