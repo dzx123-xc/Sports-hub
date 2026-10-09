@@ -18,6 +18,7 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from database import DB_PATH, get_db, hash_pw, verify_pw, init_db, USING_POSTGRES
+from app.security.totp import verify_totp
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -860,6 +861,12 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 # Admin is a separate protected identity. No database/demo admin can authenticate.
                 if identifier.lower() == ADMIN_USERNAME.lower() or identifier.lower() == 'admin@sportsconnect.com':
                     if ADMIN_PASSWORD and identifier.lower() == ADMIN_USERNAME.lower() and password == ADMIN_PASSWORD:
+                        totp_secret = os.getenv('ADMIN_TOTP_SECRET', '').strip()
+                        if totp_secret and not verify_totp(totp_secret, body.get('totp_code', '')):
+                            return self.send_json({'error': 'A valid administrator authenticator code is required.'}, 401)
+                        if not totp_secret and os.getenv('ADMIN_TOTP_REQUIRED', '').lower() in ('1', 'true', 'yes'):
+                            logger.error("ADMIN_TOTP_REQUIRED is enabled but ADMIN_TOTP_SECRET is missing")
+                            return self.send_json({'error': 'Administrator MFA is not configured. Contact the platform operator.'}, 503)
                         token = issue_admin_session()
                         admin_user = {
                             'id': 0, 'username': ADMIN_USERNAME, 'email': 'admin@sportsconnect.local',
