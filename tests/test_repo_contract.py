@@ -86,5 +86,6 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("Your report was not submitted.", app)
         self.assertNotIn("return { success: true, report_id: 1024, status: 'Under Review' };", app)
         self.assertIn("Report could not be submitted. Please try again.", app)
-\nif __name__ == "__main__":
+
+if __name__ == "__main__":
     unittest.main()
