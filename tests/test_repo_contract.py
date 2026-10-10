@@ -103,6 +103,15 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("You cannot report your own account.", server)
         self.assertIn("Report description must contain 1–5000 characters.", server)
 
+    def test_message_history_is_fetched_before_read_receipts_are_updated(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        route = server.split("if other_id:", 1)[1].split("# 9. Notifications", 1)[0]
+        self.assertIn("conversation_messages = [dict(row) for row in cursor.fetchall()]", route)
+        self.assertLess(
+            route.index("conversation_messages = [dict(row) for row in cursor.fetchall()]"),
+            route.index("UPDATE messages SET is_read = 1"),
+        )
+
     def test_report_submission_never_returns_fake_success_on_api_failure(self):
         app = (ROOT / "app.js").read_text(encoding="utf-8")
         self.assertIn("success: false", app)
