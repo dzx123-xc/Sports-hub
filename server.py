@@ -622,7 +622,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 if not user_id:
                     return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
-                SELECT c.id, c.status, c.created_at,
+                SELECT c.id, c.requester_id, c.recipient_id, c.status, c.created_at,
                        CASE WHEN c.requester_id = ? THEN c.recipient_id ELSE c.requester_id END AS other_user_id,
                        u.full_name, u.role, u.avatar, u.location
                 FROM connections c
