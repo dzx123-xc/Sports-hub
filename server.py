@@ -647,6 +647,11 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                     WHERE (m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?)
                     ORDER BY m.timestamp ASC
                     """, (user_id, other_id, other_id, user_id))
+                    cursor.execute(
+                        "UPDATE messages SET is_read = 1 WHERE sender_id = ? AND recipient_id = ? AND is_read = 0",
+                        (other_id, user_id),
+                    )
+                    conn.commit()
                 else:
                     cursor.execute("""
                     SELECT m.*, u.full_name as sender_name, u.avatar as sender_avatar
