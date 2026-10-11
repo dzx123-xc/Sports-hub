@@ -119,5 +119,26 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertNotIn("return { success: true, report_id: 1024, status: 'Under Review' };", app)
         self.assertIn("Report could not be submitted. Please try again.", app)
 
+    def test_connection_requests_validate_targets_and_prevent_duplicates(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        route = server.split("elif path == '/api/connections':", 1)[1].split(
+            "elif path == '/api/connections/respond':", 1
+        )[0]
+        self.assertIn("A valid recipient_id is required.", route)
+        self.assertIn("You cannot connect to your own account.", route)
+        self.assertIn("Recipient account not found or inactive.", route)
+        self.assertIn("Connection request already pending.", route)
+        self.assertIn("You are already connected.", route)
+        self.assertIn("ORDER BY created_at DESC", route)
+
+    def test_connection_response_is_limited_to_recipient(self):
+        server = (ROOT / "server.py").read_text(encoding="utf-8")
+        route = server.split("elif path == '/api/connections/respond':", 1)[1].split(
+            "elif path == '/api/messages':", 1
+        )[0]
+        self.assertIn("Only the connection recipient can respond to this request.", route)
+        self.assertIn("Connection request is no longer pending.", route)
+        self.assertIn('status not in ("accepted", "declined")', route)
+
 if __name__ == "__main__":
     unittest.main()
