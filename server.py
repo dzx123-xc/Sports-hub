@@ -1312,9 +1312,38 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             # 8. Connections & Messages
             elif path == '/api/connections':
                 requester_id = current_user_id(self)
-                recipient_id = body.get('recipient_id')
                 if not requester_id:
                     return self.send_json({"error": "Authentication required."}, 401)
+
+                try:
+                    recipient_id = int(body.get('recipient_id'))
+                except (TypeError, ValueError):
+                    return self.send_json({"error": "A valid recipient_id is required."}, 400)
+                if recipient_id == int(requester_id):
+                    return self.send_json({"error": "You cannot connect to your own account."}, 400)
+
+                recipient = cursor.execute(
+                    "SELECT id, status FROM users WHERE id = ?", (recipient_id,)
+                ).fetchone()
+                if not recipient or recipient['status'] != 'active':
+                    return self.send_json({"error": "Recipient account not found or inactive."}, 404)
+
+                existing = cursor.execute("""
+                    SELECT id, requester_id, recipient_id, status
+                    FROM connections
+                    WHERE (requester_id = ? AND recipient_id = ?)
+                       OR (requester_id = ? AND recipient_id = ?)
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (requester_id, recipient_id, recipient_id, requester_id)).fetchone()
+                if existing and existing["status"] == "accepted":
+                    return self.send_json({"error": "You are already connected."}, 409)
+                if existing and existing["status"] == "pending":
+                    if int(existing["requester_id"]) == int(requester_id):
+                        return self.send_json({"error": "Connection request already pending."}, 409)
+                    return self.send_json({
+                        "error": "This player has already sent you a request. Accept it from Connection requests."
+                    }, 409)
 
                 now = datetime.now().isoformat()
                 cursor.execute("""
