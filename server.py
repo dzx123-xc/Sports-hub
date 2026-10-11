@@ -622,7 +622,7 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                 if not user_id:
                     return self.send_json({"error": "Authentication required."}, 401)
                 cursor.execute("""
-                SELECT c.id, c.status, c.created_at,
+                SELECT c.id, c.requester_id, c.recipient_id, c.status, c.created_at,
                        CASE WHEN c.requester_id = ? THEN c.recipient_id ELSE c.requester_id END AS other_user_id,
                        u.full_name, u.role, u.avatar, u.location
                 FROM connections c
@@ -647,6 +647,15 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
                     WHERE (m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?)
                     ORDER BY m.timestamp ASC
                     """, (user_id, other_id, other_id, user_id))
+                    # Fetch the conversation before reusing this cursor for the read update.
+                    # Otherwise the UPDATE replaces the SELECT result set and the chat appears empty.
+                    conversation_messages = [dict(row) for row in cursor.fetchall()]
+                    cursor.execute(
+                        "UPDATE messages SET is_read = 1 WHERE sender_id = ? AND recipient_id = ? AND is_read = 0",
+                        (other_id, user_id),
+                    )
+                    conn.commit()
+                    return self.send_json({"messages": conversation_messages})
                 else:
                     cursor.execute("""
                     SELECT m.*, u.full_name as sender_name, u.avatar as sender_avatar
@@ -1303,9 +1312,38 @@ class SportsConnectHandler(http.server.SimpleHTTPRequestHandler):
             # 8. Connections & Messages
             elif path == '/api/connections':
                 requester_id = current_user_id(self)
-                recipient_id = body.get('recipient_id')
                 if not requester_id:
                     return self.send_json({"error": "Authentication required."}, 401)
+
+                try:
+                    recipient_id = int(body.get('recipient_id'))
+                except (TypeError, ValueError):
+                    return self.send_json({"error": "A valid recipient_id is required."}, 400)
+                if recipient_id == int(requester_id):
+                    return self.send_json({"error": "You cannot connect to your own account."}, 400)
+
+                recipient = cursor.execute(
+                    "SELECT id, status FROM users WHERE id = ?", (recipient_id,)
+                ).fetchone()
+                if not recipient or recipient['status'] != 'active':
+                    return self.send_json({"error": "Recipient account not found or inactive."}, 404)
+
+                existing = cursor.execute("""
+                    SELECT id, requester_id, recipient_id, status
+                    FROM connections
+                    WHERE (requester_id = ? AND recipient_id = ?)
+                       OR (requester_id = ? AND recipient_id = ?)
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (requester_id, recipient_id, recipient_id, requester_id)).fetchone()
+                if existing and existing["status"] == "accepted":
+                    return self.send_json({"error": "You are already connected."}, 409)
+                if existing and existing["status"] == "pending":
+                    if int(existing["requester_id"]) == int(requester_id):
+                        return self.send_json({"error": "Connection request already pending."}, 409)
+                    return self.send_json({
+                        "error": "This player has already sent you a request. Accept it from Connection requests."
+                    }, 409)
 
                 now = datetime.now().isoformat()
                 cursor.execute("""

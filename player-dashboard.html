@@ -48,9 +48,9 @@
         <button class="side-item" onclick="showResumeTab('trials')">
           <span class="icon">⚡</span> Trials & Opportunities
         </button>
-        <button class="side-item" onclick="showResumeTab('messages')">
+        <a class="side-item" href="messages.html" style="text-decoration:none;">
           <span class="icon">💬</span> Messages & Network
-        </button>
+        </a>
         <button class="side-item" onclick="showResumeTab('privacy')">
           <span class="icon">⚙️</span> Privacy Settings
         </button>
@@ -690,8 +690,7 @@
       } else if (tabName === 'privacy') {
         document.getElementById('sectionPrivacy').scrollIntoView({ behavior: 'smooth' });
       } else if (tabName === 'messages') {
-        UIController.showToast('Opening active scout message thread with Coach Vikram Rathore...');
-        setTimeout(() => SessionManager.switchDemoUser('coach'), 700);
+        window.location.href = 'messages.html';
       } else {
         filterResumeTab('about', document.querySelectorAll('.resume-tab-btn')[0]);
         document.getElementById('sectionResume').scrollIntoView({ behavior: 'smooth' });
